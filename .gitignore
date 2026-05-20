@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.tmp
+.venv/
+.DS_Store
+Thumbs.db
+
+# Datos crudos grandes — se descargan con descargar_datos.py en cada run
+data/*.csv
+data/*.zip
+data/presupuesto-sancionado-*.xlsx
+
+# (IPCBA_empalmado.xlsx sí se commitea porque es chico — 28KB)

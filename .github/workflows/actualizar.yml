@@ -1,0 +1,46 @@
+name: Actualizacion Automatica Presupuesto
+on:
+  schedule:
+    - cron: '0 14 * * *'   # 14:00 UTC = 11:00 ART · todos los días
+  workflow_dispatch:        # también permite ejecución manual
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar librerias
+        run: pip install requests openpyxl
+
+      - name: Bajar datos crudos (BA Data + IDECBA)
+        run: python descargar_datos.py
+
+      - name: Recalcular IPC desde IPCBA empalmado
+        run: python build_ipc.py
+
+      - name: Generar budget_data.json
+        run: python data/build_budget_data.py
+
+      - name: Inyectar JSON inline en HTML
+        run: python inyectar_html.py
+
+      - name: Regenerar calendario de publicaciones
+        run: python build_calendario.py
+
+      - name: Commit y push
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add tablero-presupuesto.html budget_data.json data/build_budget_data.py data/IPCBA_empalmado.xlsx data/pe-*.csv data/presupuesto-sancionado-2026.xlsx 2>/dev/null || true
+          git diff --cached --quiet && echo "Sin cambios" && exit 0
+          git commit -m "Auto-update: $(date +'%Y-%m-%d %H:%M')"
+          git push
