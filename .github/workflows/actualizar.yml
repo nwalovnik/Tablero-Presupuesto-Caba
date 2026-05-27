@@ -19,7 +19,7 @@ jobs:
           python-version: '3.11'
 
       - name: Instalar librerias
-        run: pip install requests openpyxl
+        run: pip install requests openpyxl pdfplumber
 
       - name: Bajar datos crudos (BA Data + IDECBA)
         run: python descargar_datos.py
@@ -29,6 +29,10 @@ jobs:
 
       - name: Generar budget_data.json
         run: python data/build_budget_data.py
+
+      - name: Parsear ejecucion provisoria/definitiva GCBA (PDF)
+        continue-on-error: true
+        run: python data/parser_ejec_provisoria.py
 
       - name: Inyectar JSON inline en HTML
         run: python inyectar_html.py
@@ -40,7 +44,7 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add tablero-presupuesto.html budget_data.json data/build_budget_data.py data/IPCBA_empalmado.xlsx data/pe-*.csv data/presupuesto-sancionado-2026.xlsx 2>/dev/null || true
+          git add tablero-presupuesto.html budget_data.json data/ejecucion_provisoria.json data/build_budget_data.py data/IPCBA_empalmado.xlsx data/pe-*.csv data/presupuesto-sancionado-2026.xlsx 2>/dev/null || true
           git diff --cached --quiet && echo "Sin cambios" && exit 0
           git commit -m "Auto-update: $(date +'%Y-%m-%d %H:%M')"
           git push
