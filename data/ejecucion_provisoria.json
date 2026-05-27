@@ -1,0 +1,39 @@
+{
+  "year": 2026,
+  "trim": 1,
+  "definitivo": false,
+  "pdf_url": "https://static.buenosaires.gob.ar/sites/default/files/2026-05/1ER_TRIM_2026.pdf",
+  "pdf_filename": "1ER_TRIM_2026.pdf",
+  "fetched_at": "2026-05-27T09:51:40",
+  "totals": {
+    "sancion": 17344864165159.0,
+    "vigente": 17350225639379.0,
+    "definitivo": 3705532701602.95,
+    "devengado": 2925422585040.33
+  },
+  "by_inciso": {},
+  "by_jur": {
+    "Legislatura De La Ciudad De Buenos Aires": 26631774508.74,
+    "Auditoria General De La Ciudad De Buenos Aires": 10583397085.56,
+    "Defensoria Del Pueblo": 14083781504.74,
+    "Ministerio Publico": 103552524717.23,
+    "Tribunal Superior De Justicia": 9184678129.24,
+    "Consejo De La Magistratura": 64156862737.0,
+    "Sindicatura General De La Ciudad De Buenos Aires": 1825698552.02,
+    "Procuracion General De La Ciudad": 9996610791.49,
+    "Jefatura De Gobierno": 130705836456.41,
+    "Jefatura De Gabinete De Ministros": 87535127276.13,
+    "Ministerio De Justicia": 34117598908.25,
+    "Ministerio De Seguridad": 392216071356.01,
+    "Ministerio De Movilidad E Infraestructura": 212081448324.25,
+    "Ministerio De Espacio Publico E Higiene Urbana": 315517962747.84,
+    "Ministerio De Salud": 529367150954.17,
+    "Ministerio De Desarrollo Humano Y Hábitat": 167759790685.01,
+    "Ministerio De Cultura": 67078700972.93,
+    "Ministerio De Educación": 612192794626.57,
+    "Ministerio De Hacienda Y Finanzas": 61511721533.0,
+    "Ministerio De Desarrollo Económico": 22352979509.47,
+    "Servicio De La Deuda Publica": 6426676879.23,
+    "Obligaciones A Cargo Del Tesoro": 46543396785.04
+  }
+}
