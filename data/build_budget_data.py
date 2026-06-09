@@ -21,7 +21,7 @@ YEARS = YEARS_HIST + YEARS_EXEC + [YEAR_SANC]
 # Cálculo: promedio anual simple de los 12 meses para 2013-2025; rebase a 2019=100.
 # 2026: IPC_prom_2025 × (avg(Jan-Mar 2026) / avg(Jan-Mar 2025)) — método de
 # períodos comparables porque 2026 sólo tiene datos hasta marzo.
-IPC_PROMEDIO_ANUAL = {  # base 2019=100
+IPC_PROMEDIO_ANUAL = {  # base 2019=100 (auto-generado por build_ipc.py)
     2013: 15.6748,
     2014: 21.6439,
     2015: 27.3878,
