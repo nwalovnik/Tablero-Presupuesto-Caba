@@ -37,6 +37,13 @@ ARCHIVOS = [
     (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2023-4.csv',           'pe-2023-4.csv'),
     (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2024-4.csv',           'pe-2024-4.csv'),
     (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2025-4.csv',           'pe-2025-4.csv'),
+    # CSV ejecutado 2026 trimestres parciales (1T disponible; 2T/3T/4T en orden de publicación
+    # — las que no existan aún devolverán 404 y se ignoran; cuando se publiquen, se descargan
+    # automáticamente sin tocar el código).
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2026-1.csv',           'pe-2026-1.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2026-2.csv',           'pe-2026-2.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2026-3.csv',           'pe-2026-3.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2026-4.csv',           'pe-2026-4.csv'),
     # XLSX sancionado 2026 (Ley 6929)
     (f'{BA}/presupuesto-sancionado/presupuesto-sancionado-2026.xlsx',          'presupuesto-sancionado-2026.xlsx'),
     # XLSX IPCBA empalmado (base 2021=100, mensual, jul-2012 → presente)

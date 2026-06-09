@@ -21,7 +21,7 @@ YEARS = YEARS_HIST + YEARS_EXEC + [YEAR_SANC]
 # Cálculo: promedio anual simple de los 12 meses para 2013-2025; rebase a 2019=100.
 # 2026: IPC_prom_2025 × (avg(Jan-Mar 2026) / avg(Jan-Mar 2025)) — método de
 # períodos comparables porque 2026 sólo tiene datos hasta marzo.
-IPC_PROMEDIO_ANUAL = {  # base 2019=100 (auto-generado por build_ipc.py)
+IPC_PROMEDIO_ANUAL = {  # base 2019=100
     2013: 15.6748,
     2014: 21.6439,
     2015: 27.3878,
@@ -86,7 +86,15 @@ def detect_sep(sample: bytes) -> str:
     return ',' if sample.count(b',') > sample.count(b';') else ';'
 
 def load_year(year: int):
-    path = os.path.join(DATA_DIR, f'pe-{year}-4.csv')
+    # Prefer cierre anual (Q4); fallback a último trimestre disponible (Q3, Q2, Q1)
+    path = None
+    for q in (4, 3, 2, 1):
+        cand = os.path.join(DATA_DIR, f'pe-{year}-{q}.csv')
+        if os.path.exists(cand):
+            path = cand
+            break
+    if path is None:
+        raise FileNotFoundError(f'No CSV for {year} (tried pe-{year}-[1-4].csv)')
     with open(path, 'rb') as f:
         sample = f.read(500)
     sep = detect_sep(sample)
@@ -162,13 +170,15 @@ def to_float_smart(v):
         return 0.0
 
 def agg_records(records, amount_key='devengado'):
-    """records: list of dicts with keys jur,fin,fun,prog,inc + amount keys."""
+    """records: list of dicts with keys jur,fin,fun,prog,inc,sparc + amount keys."""
     totals = {'sancion':0.0,'vigente':0.0,'devengado':0.0}
     by_jur = defaultdict(float)
     by_fin = defaultdict(float)
     by_fun = defaultdict(float)
     by_prog = defaultdict(float)
     by_inc = defaultdict(float)
+    by_sparc = defaultdict(float)  # nivel máximo de desagregación del objeto del gasto
+    sparc_meta = {}                # sparc_desc -> (inc_desc) parent (para etiquetar)
     vig_by_jur = defaultdict(float)
     jur_prog = defaultdict(float)   # (jur, prog) -> amount
     jur_fin = defaultdict(float)    # (jur, fin) -> amount
@@ -178,6 +188,7 @@ def agg_records(records, amount_key='devengado'):
         totals['vigente'] += r.get('vigente',0.0)
         totals['sancion'] += r.get('sancion',0.0)
         j,f,fu,p,i = r.get('jur',''),r.get('fin',''),r.get('fun',''),r.get('prog',''),r.get('inc','')
+        sp = r.get('sparc','')
         if j:
             by_jur[j] += amt
             vig_by_jur[j] += r.get('vigente',0.0)
@@ -185,6 +196,11 @@ def agg_records(records, amount_key='devengado'):
         if fu: by_fun[fu] += amt
         if p: by_prog[p] += amt
         if i: by_inc[i] += amt
+        if sp:
+            by_sparc[sp] += amt
+            # asociar al padre inciso (primera vez gana)
+            if sp not in sparc_meta and i:
+                sparc_meta[sp] = i
         if j and p: jur_prog[j+'||'+p] += amt
         if j and f: jur_fin[j+'||'+f] += amt
     return {
@@ -194,6 +210,8 @@ def agg_records(records, amount_key='devengado'):
         'by_fun': dict(by_fun),
         'by_prog': dict(by_prog),
         'by_inc': dict(by_inc),
+        'by_sparc': dict(by_sparc),
+        'sparc_inc': sparc_meta,
         'vig_by_jur': dict(vig_by_jur),
         'jur_prog': dict(jur_prog),
         'jur_fin': dict(jur_fin),
@@ -211,15 +229,31 @@ def agg_year_csv(rows):
         if not jur: continue  # skip grand-total rows present in some CSVs (e.g. 2019)
         eco_code = str(get_col(r,'eco','eco_cod') or '').strip()
         if eco_code.startswith('23'): continue  # skip Aplicaciones Financieras
+        # Sparc (máximo nivel) cuando exista; fallback a Parc; último fallback a Ppal.
+        # Esto mantiene cobertura histórica: 2013-2018 + 2024-2026 traen Sparc;
+        # 2019-2023 traen sólo Ppal (un nivel arriba) — los etiquetamos con prefijo
+        # «[grano grueso]» para que el dashboard pueda distinguir y normalizar.
+        sparc_raw = (get_col(r,'desc_sparc','sparc_desc') or '').strip()
+        parc_raw = (get_col(r,'desc_parc','parc_desc') or '').strip()
+        ppal_raw = (get_col(r,'desc_ppal','ppal_desc') or '').strip()
+        if sparc_raw:
+            sparc = sparc_raw.title()
+        elif parc_raw:
+            sparc = parc_raw.title()
+        elif ppal_raw:
+            sparc = ppal_raw.title()
+        else:
+            sparc = ''
         records.append({
-            'devengado': to_float_smart(get_col(r,'devengado','devengado_trim4_cont')),
-            'vigente': to_float_smart(get_col(r,'vigente','vigente_trim4_cont')),
+            'devengado': to_float_smart(get_col(r,'devengado','devengado_trim4_cont','devengado_trim1_cont','devengado_trim2_cont','devengado_trim3_cont')),
+            'vigente': to_float_smart(get_col(r,'vigente','vigente_trim4_cont','vigente_trim1_cont','vigente_trim2_cont','vigente_trim3_cont')),
             'sancion': to_float_smart(get_col(r,'sancion','sanci0n')),
             'jur': (get_col(r,'jur_desc','desc_jur') or '').title(),
             'fin': (get_col(r,'fin_desc','desc_fin') or '').title(),
             'fun': (get_col(r,'fun_desc','desc_fun') or '').title(),
             'prog': (get_col(r,'prog_desc','desc_prog') or '').title(),
             'inc': (get_col(r,'inc_desc','inciso_desc','incisco_desc','desc_inc') or '').title(),
+            'sparc': sparc,
         })
     return agg_records(records, amount_key='devengado')
 
@@ -247,6 +281,11 @@ def load_2026_xlsx():
         sanc_val = row[40] if len(row)>40 else 0  # Sanción column (encoding garbled name)
         try: sanc = float(sanc_val) if sanc_val is not None else 0.0
         except (ValueError,TypeError): sanc = 0.0
+        # Sparc con fallback Parc/Ppal (mismo criterio que CSV ejecutados)
+        sparc_raw = str(d.get('Desc_Sparc') or '').strip()
+        parc_raw = str(d.get('Desc_Parc') or '').strip()
+        ppal_raw = str(d.get('Desc_Ppal') or '').strip()
+        sparc = (sparc_raw or parc_raw or ppal_raw).title()
         records.append({
             'devengado': 0.0, 'vigente': 0.0, 'sancion': sanc,
             'jur': str(d.get('Desc_Jur') or '').title(),
@@ -254,6 +293,7 @@ def load_2026_xlsx():
             'fun': str(d.get('Desc_Fun') or '').title(),
             'prog': str(d.get('Desc_Prog') or '').title(),
             'inc': str(d.get('Desc_Inc') or '').title(),
+            'sparc': sparc,
         })
     return agg_records(records, amount_key='sancion')
 
@@ -271,10 +311,60 @@ def main():
         agg = agg_year_csv(rows)
         print(f'  rows:{len(rows):,} devengado:{agg["totals"]["devengado"]:,.0f}')
         result['data'][str(y)] = agg
-    print(f'Loading {YEAR_SANC} (sanción)...', flush=True)
+    print(f'Loading {YEAR_SANC} (sanción XLSX)...', flush=True)
     agg26 = load_2026_xlsx()
-    print(f'  sancion:{agg26["totals"]["sancion"]:,.0f}')
+    print(f'  sancion XLSX: {agg26["totals"]["sancion"]:,.0f}')
     result['data'][str(YEAR_SANC)] = agg26
+    # Si hay CSV ejecutado parcial del año sanc (1T, 2T, etc.), parsearlo y guardarlo
+    # como provisorio detallado (con by_sparc) — sobrescribe el provisorio del PDF
+    # que es menos granular.
+    csv_exec_paths = [(q, os.path.join(DATA_DIR, f'pe-{YEAR_SANC}-{q}.csv')) for q in (4,3,2,1)]
+    csv_exec = next(((q,p) for q,p in csv_exec_paths if os.path.exists(p)), None)
+    if csv_exec:
+        q, path = csv_exec
+        print(f'  + CSV ejecutado {q}T {YEAR_SANC} encontrado: {os.path.basename(path)}', flush=True)
+        rows_exec = load_year(YEAR_SANC)
+        agg26_exec = agg_year_csv(rows_exec)
+        print(f'  CSV rows:{len(rows_exec):,} devengado:{agg26_exec["totals"]["devengado"]:,.0f}')
+        agg26['provisorio_csv'] = {
+            'trimestre': q,
+            'ejercicio': YEAR_SANC,
+            'etiqueta': f'{q}T {YEAR_SANC} ejecutado (CSV BA Data)',
+            'totals': agg26_exec['totals'],
+            'by_jur': agg26_exec['by_jur'],
+            'by_fin': agg26_exec['by_fin'],
+            'by_inc': agg26_exec['by_inc'],
+            'by_sparc': agg26_exec['by_sparc'],
+            'sparc_inc': agg26_exec.get('sparc_inc', {}),
+            'source': f'pe-{YEAR_SANC}-{q}.csv (BA Data)',
+        }
+
+    # Merge ejecución provisoria (PDF GCBA Contaduría) si existe el JSON parseado
+    prov_path = os.path.join(DATA_DIR, 'provisorio.json')
+    if os.path.exists(prov_path):
+        with open(prov_path, 'r', encoding='utf-8') as f:
+            prov = json.load(f)
+        ejercicio = prov.get('meta', {}).get('ejercicio')
+        if ejercicio and str(ejercicio) in result['data']:
+            # Source URL (si existe)
+            src_url = ''
+            src_path = os.path.join(DATA_DIR, 'provisorio_source.txt')
+            if os.path.exists(src_path):
+                with open(src_path, 'r', encoding='utf-8') as f:
+                    lines = f.read().strip().split('\n')
+                    if len(lines) >= 2: src_url = lines[1]
+            # Adjuntar provisorio al año del ejercicio
+            result['data'][str(ejercicio)]['provisorio'] = {
+                'etiqueta': prov['meta'].get('etiqueta', ''),
+                'trimestre': prov['meta'].get('trimestre'),
+                'totals': prov['totals'],
+                'by_jur': prov['by_jur'],
+                'by_inc': prov['by_inc'],
+                'by_fin': prov['by_fin'],
+                'source_url': src_url,
+                'source_pdf': prov.get('source_pdf', ''),
+            }
+            print(f'  + provisorio adjuntado a {ejercicio}: {prov["meta"].get("etiqueta")} | dev=${prov["totals"]["devengado"]:,.0f}')
 
     def round_tree(o, key=None):
         if isinstance(o, dict): return {k: round_tree(v, k) for k,v in o.items()}
@@ -317,10 +407,21 @@ def main():
                 jur, rest = k.split('||', 1)
                 new[canonical[norm_jur(jur)] + '||' + rest] += v
             d[dim] = dict(new)
-    # limit by_prog top 30, keep by_jur/fin full, jur_prog full (needed for filters)
+    # limit by_prog top 30, by_sparc top 50, keep by_jur/fin full, jur_prog full (filters)
     for y in YEARS:
         d = result['data'][str(y)]
         d['by_prog'] = dict(sorted(d['by_prog'].items(), key=lambda x:-x[1])[:30])
+        if 'by_sparc' in d:
+            d['by_sparc'] = dict(sorted(d['by_sparc'].items(), key=lambda x:-x[1])[:50])
+            # Limpiar sparc_inc para que coincida con los 50 top
+            if 'sparc_inc' in d:
+                d['sparc_inc'] = {k: v for k, v in d['sparc_inc'].items() if k in d['by_sparc']}
+        # También recortar by_sparc del provisorio_csv si existe (año sanc)
+        if 'provisorio_csv' in d and 'by_sparc' in d['provisorio_csv']:
+            pc = d['provisorio_csv']
+            pc['by_sparc'] = dict(sorted(pc['by_sparc'].items(), key=lambda x:-x[1])[:50])
+            if 'sparc_inc' in pc:
+                pc['sparc_inc'] = {k: v for k, v in pc['sparc_inc'].items() if k in pc['by_sparc']}
     with open(OUT, 'w', encoding='utf-8') as f:
         json.dump(result, f, ensure_ascii=False, separators=(',',':'))
     print(f'Wrote {OUT} ({os.path.getsize(OUT):,} bytes)')
