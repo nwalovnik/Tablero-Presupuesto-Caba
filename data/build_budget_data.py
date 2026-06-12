@@ -483,6 +483,31 @@ def main():
             for jur, v in t.get('by_jur', {}).items():
                 new[canonical[norm_jur(jur)]] += v
             t['by_jur'] = dict(new)
+    # Deduplicate conceptos Sparc con diferencias tipográficas (tildes), igual que jur:
+    # sin esto la serie histórica de un concepto se parte en dos claves distintas
+    # (ej. "Productos Farmaceuticos" 2019-2023 vs "Productos Farmacéuticos" resto).
+    def _sparc_sources(d):
+        srcs = [d]
+        if 'provisorio_csv' in d: srcs.append(d['provisorio_csv'])
+        srcs.extend(d.get('trims', {}).values())
+        return srcs
+    sp_variants = defaultdict(set)
+    for y in YEARS:
+        for src in _sparc_sources(result['data'][str(y)]):
+            for sp in src.get('by_sparc', {}):
+                sp_variants[norm_jur(sp)].add(sp)
+    sp_canon = {}
+    for k, vs in sp_variants.items():
+        sp_canon[k] = max(vs, key=lambda x: sum(1 for c in x if unicodedata.category(c) == 'Mn' or c in 'áéíóúÁÉÍÓÚñÑ'))
+    for y in YEARS:
+        for src in _sparc_sources(result['data'][str(y)]):
+            if 'by_sparc' in src:
+                new = defaultdict(int)
+                for sp, v in src['by_sparc'].items():
+                    new[sp_canon[norm_jur(sp)]] += v
+                src['by_sparc'] = dict(new)
+            if 'sparc_inc' in src:
+                src['sparc_inc'] = {sp_canon[norm_jur(sp)]: v for sp, v in src['sparc_inc'].items()}
     # limit by_prog top 30, by_sparc top 50, keep by_jur/fin full, jur_prog full (filters)
     for y in YEARS:
         d = result['data'][str(y)]
