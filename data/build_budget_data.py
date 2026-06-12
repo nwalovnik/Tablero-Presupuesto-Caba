@@ -38,24 +38,21 @@ IPC_PROMEDIO_ANUAL = {  # base 2019=100 (auto-generado por build_ipc.py)
     2026: 4919.8040,
 }
 
-def load_year_from_zip(zip_path: str, year: int):
-    """Load Q4 CSV for a given year from the historico ZIP."""
-    pattern = f'{year}'
+TRIM_NOMBRE = {1: 'primer', 2: 'segundo', 3: 'tercer', 4: 'cuarto'}
+
+def load_year_from_zip(zip_path: str, year: int, quarter: int = 4):
+    """Load a quarterly CSV for a given year from the historico ZIP.
+
+    quarter=4 (default) = cierre anual. Los archivos del ZIP se llaman
+    presupuesto-ejecutado-YYYY-{primer|segundo|tercer|cuarto}-trimestre.csv
+    y traen devengado ACUMULADO al trimestre."""
+    nombre = TRIM_NOMBRE[quarter]
     with zipfile.ZipFile(zip_path, 'r') as zf:
         names = zf.namelist()
-        # Find the cuarto-trimestre file for this year
-        candidates = [n for n in names if str(year) in n and ('4' in n.split('/')[-1] or 'cuarto' in n.lower())]
+        candidates = [n for n in names if str(year) in n and nombre in n.lower()]
         if not candidates:
-            candidates = sorted([n for n in names if str(year) in n])
-        if not candidates:
-            raise FileNotFoundError(f'No CSV for {year} in {zip_path}. Available: {names}')
-        # Prefer "cuarto" or "4to" or last quarter
-        chosen = candidates[-1]
-        for c in candidates:
-            base = c.lower()
-            if 'cuarto' in base or '-4-' in base or '_4_' in base or base.endswith('4.csv'):
-                chosen = c
-                break
+            raise FileNotFoundError(f'No CSV {nombre}-trimestre {year} in {zip_path}')
+        chosen = candidates[0]
         print(f'  ZIP: using {chosen}')
         with zf.open(chosen) as raw:
             sample = raw.read(500)
@@ -77,6 +74,7 @@ def load_year_from_zip(zip_path: str, year: int):
         for k, v in r.items():
             if k is None: continue
             nk = k.lower().strip().replace('ó','o').replace('í','i').replace('á','a').replace('é','e').replace('ú','u')
+            if nk.startswith('sumade'): nk = nk[6:]  # pe-2024-3 trae prefijo "SumaDe" en montos
             nr[nk] = v
         norm_rows.append(nr)
     return norm_rows
@@ -85,16 +83,18 @@ def load_year_from_zip(zip_path: str, year: int):
 def detect_sep(sample: bytes) -> str:
     return ',' if sample.count(b',') > sample.count(b';') else ';'
 
-def load_year(year: int):
-    # Prefer cierre anual (Q4); fallback a último trimestre disponible (Q3, Q2, Q1)
+def load_year(year: int, quarter: int = None):
+    """Carga pe-{year}-{quarter}.csv. Si quarter es None, prefiere cierre anual
+    (Q4) con fallback al último trimestre disponible."""
     path = None
-    for q in (4, 3, 2, 1):
+    quarters = (quarter,) if quarter else (4, 3, 2, 1)
+    for q in quarters:
         cand = os.path.join(DATA_DIR, f'pe-{year}-{q}.csv')
         if os.path.exists(cand):
             path = cand
             break
     if path is None:
-        raise FileNotFoundError(f'No CSV for {year} (tried pe-{year}-[1-4].csv)')
+        raise FileNotFoundError(f'No CSV for {year} (tried pe-{year}-{list(quarters)}.csv)')
     with open(path, 'rb') as f:
         sample = f.read(500)
     sep = detect_sep(sample)
@@ -114,6 +114,7 @@ def load_year(year: int):
         for k, v in r.items():
             if k is None: continue
             nk = k.lower().strip().replace('ó','o').replace('í','i').replace('á','a').replace('é','e').replace('ú','u')
+            if nk.startswith('sumade'): nk = nk[6:]  # pe-2024-3 trae prefijo "SumaDe" en montos
             nr[nk] = v
         norm_rows.append(nr)
     # Fix 2022 off-by-one: first column is composite ID, all labels shifted left
@@ -217,6 +218,16 @@ def agg_records(records, amount_key='devengado'):
         'jur_fin': dict(jur_fin),
     }
 
+# Esquema viejo (CSVs trimestrales 2013-2015): no trae descripción de finalidad,
+# sólo el código numérico. Mapeo con las mismas etiquetas .title() de los años nuevos.
+FIN_COD = {
+    '1': 'Administracion Gubernamental',
+    '2': 'Servicios De Seguridad',
+    '3': 'Servicios Sociales',
+    '4': 'Servicios Economicos',
+    '5': 'Deuda Publica - Intereses Y Gastos',
+}
+
 def agg_year_csv(rows):
     """For executed CSVs 2013-2025. Skips subtotal/total rows (empty jurisdiction)
     and Aplicaciones Financieras (Clas. Económica = 23xx: amortización de deuda
@@ -225,17 +236,19 @@ def agg_year_csv(rows):
     records = []
     for r in rows:
         if not r: continue
-        jur = (get_col(r,'jur_desc','desc_jur') or '').strip()
+        # 'desc_juris' / 'clas_economico' etc.: esquema viejo de los CSVs
+        # trimestrales 2013-2015 dentro del ZIP histórico (minúsculas, nombres largos)
+        jur = (get_col(r,'jur_desc','desc_jur','desc_juris') or '').strip()
         if not jur: continue  # skip grand-total rows present in some CSVs (e.g. 2019)
-        eco_code = str(get_col(r,'eco','eco_cod') or '').strip()
+        eco_code = str(get_col(r,'eco','eco_cod','clas_economico') or '').strip()
         if eco_code.startswith('23'): continue  # skip Aplicaciones Financieras
         # Sparc (máximo nivel) cuando exista; fallback a Parc; último fallback a Ppal.
         # Esto mantiene cobertura histórica: 2013-2018 + 2024-2026 traen Sparc;
         # 2019-2023 traen sólo Ppal (un nivel arriba) — los etiquetamos con prefijo
         # «[grano grueso]» para que el dashboard pueda distinguir y normalizar.
-        sparc_raw = (get_col(r,'desc_sparc','sparc_desc') or '').strip()
-        parc_raw = (get_col(r,'desc_parc','parc_desc') or '').strip()
-        ppal_raw = (get_col(r,'desc_ppal','ppal_desc') or '').strip()
+        sparc_raw = (get_col(r,'desc_sparc','sparc_desc','desc_subparcial') or '').strip()
+        parc_raw = (get_col(r,'desc_parc','parc_desc','desc_parcial') or '').strip()
+        ppal_raw = (get_col(r,'desc_ppal','ppal_desc','desc_principal') or '').strip()
         if sparc_raw:
             sparc = sparc_raw.title()
         elif parc_raw:
@@ -248,11 +261,12 @@ def agg_year_csv(rows):
             'devengado': to_float_smart(get_col(r,'devengado','devengado_trim4_cont','devengado_trim1_cont','devengado_trim2_cont','devengado_trim3_cont')),
             'vigente': to_float_smart(get_col(r,'vigente','vigente_trim4_cont','vigente_trim1_cont','vigente_trim2_cont','vigente_trim3_cont')),
             'sancion': to_float_smart(get_col(r,'sancion','sanci0n')),
-            'jur': (get_col(r,'jur_desc','desc_jur') or '').title(),
-            'fin': (get_col(r,'fin_desc','desc_fin') or '').title(),
-            'fun': (get_col(r,'fun_desc','desc_fun') or '').title(),
-            'prog': (get_col(r,'prog_desc','desc_prog') or '').title(),
-            'inc': (get_col(r,'inc_desc','inciso_desc','incisco_desc','desc_inc') or '').title(),
+            'jur': jur.title(),
+            'fin': ((get_col(r,'fin_desc','desc_fin') or '').title()
+                    or FIN_COD.get(str(get_col(r,'finalidad') or '').strip(), '')),
+            'fun': (get_col(r,'fun_desc','desc_fun','desc_fin_fun') or '').title(),
+            'prog': (get_col(r,'prog_desc','desc_prog','desc_programa') or '').title(),
+            'inc': (get_col(r,'inc_desc','inciso_desc','incisco_desc','desc_inc','desc_inciso') or '').title(),
             'sparc': sparc,
         })
     return agg_records(records, amount_key='devengado')
@@ -339,6 +353,60 @@ def main():
             'source': f'pe-{YEAR_SANC}-{q}.csv (BA Data)',
         }
 
+    # ── Ejecución trimestral acumulada (Q1-Q3) para TODOS los años ──
+    # Permite comparar 1T vs 1T entre años y poblar todos los gráficos en
+    # períodos parciales. Q4 no se duplica aquí: es el cierre anual (data
+    # principal del año). Los CSVs trimestrales 2020+ no están commiteados
+    # (pesan ~30MB c/u): se descargan en CI; si faltan, se preservan los
+    # trims del budget_data.json previo.
+    prev_trims = {}
+    if os.path.exists(OUT):
+        try:
+            with open(OUT, 'r', encoding='utf-8') as f:
+                prev_json = json.load(f)
+            for ystr, ydata in prev_json.get('data', {}).items():
+                if 'trims' in ydata:
+                    prev_trims[ystr] = ydata['trims']
+        except Exception as e:
+            print(f'  (no pude leer trims previos: {e})')
+
+    def compact_trim(agg, q):
+        top_sparc = dict(sorted(agg.get('by_sparc', {}).items(), key=lambda x: -x[1])[:50])
+        return {
+            'trimestre': q,
+            'totals': agg['totals'],
+            'by_jur': agg['by_jur'],
+            'by_fin': agg['by_fin'],
+            'by_inc': agg['by_inc'],
+            'by_prog': dict(sorted(agg['by_prog'].items(), key=lambda x: -x[1])[:30]),
+            'by_sparc': top_sparc,
+            'sparc_inc': {k: v for k, v in agg.get('sparc_inc', {}).items() if k in top_sparc},
+        }
+
+    for y in YEARS:
+        trims = {}
+        quarters = (1, 2, 3) if y != YEAR_SANC else (1, 2, 3, 4)
+        for q in quarters:
+            try:
+                if y in YEARS_HIST:
+                    rows_q = load_year_from_zip(HIST_ZIP, y, quarter=q)
+                else:
+                    csv_path = os.path.join(DATA_DIR, f'pe-{y}-{q}.csv')
+                    if not os.path.exists(csv_path):
+                        raise FileNotFoundError(csv_path)
+                    rows_q = load_year(y, quarter=q)
+                agg_q = agg_year_csv(rows_q)
+                trims[str(q)] = compact_trim(agg_q, q)
+                print(f'  trim {y}-{q}T: devengado {agg_q["totals"]["devengado"]:,.0f}')
+            except FileNotFoundError:
+                # CSV no disponible: heredar del JSON previo si existía
+                prev_q = prev_trims.get(str(y), {}).get(str(q))
+                if prev_q:
+                    trims[str(q)] = prev_q
+                    print(f'  trim {y}-{q}T: CSV ausente, preservado del JSON previo')
+        if trims:
+            result['data'][str(y)]['trims'] = trims
+
     # Merge ejecución provisoria (PDF GCBA Contaduría) si existe el JSON parseado
     prov_path = os.path.join(DATA_DIR, 'provisorio.json')
     if os.path.exists(prov_path):
@@ -389,6 +457,9 @@ def main():
     for y in YEARS:
         for jur in result['data'][str(y)].get('by_jur', {}):
             variants[norm_jur(jur)].add(jur)
+        for t in result['data'][str(y)].get('trims', {}).values():
+            for jur in t.get('by_jur', {}):
+                variants[norm_jur(jur)].add(jur)
     canonical = {}
     for k, vs in variants.items():
         # prefer variant with accents (more complete)
@@ -407,6 +478,11 @@ def main():
                 jur, rest = k.split('||', 1)
                 new[canonical[norm_jur(jur)] + '||' + rest] += v
             d[dim] = dict(new)
+        for t in d.get('trims', {}).values():
+            new = defaultdict(int)
+            for jur, v in t.get('by_jur', {}).items():
+                new[canonical[norm_jur(jur)]] += v
+            t['by_jur'] = dict(new)
     # limit by_prog top 30, by_sparc top 50, keep by_jur/fin full, jur_prog full (filters)
     for y in YEARS:
         d = result['data'][str(y)]

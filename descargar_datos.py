@@ -30,12 +30,32 @@ ARCHIVOS = [
     # ZIP histórico 2013-2019 (~30 MB, estable, sólo si falta)
     (f'{BA}/presupuesto-ejecutado/historico_presupuesto_separados_por_cuatrimestres.zip',
      'historico_2013_2019.zip'),
-    # CSVs ejecutados 2020-2025 (cierre anual = trimestre 4)
+    # CSVs ejecutados 2020-2025: cierre anual (Q4) + trimestres parciales Q1-Q3
+    # (devengado acumulado al trimestre — permiten comparar 1T vs 1T entre años).
+    # Patrón de nombre: 2020-2021 usan sufijo "-trimestre", 2022+ no.
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2020-1-trimestre.csv', 'pe-2020-1.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2020-2-trimestre.csv', 'pe-2020-2.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2020-3-trimestre.csv', 'pe-2020-3.csv'),
     (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2020-4-trimestre.csv', 'pe-2020-4.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2021-1-trimestre.csv', 'pe-2021-1.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2021-2-trimestre.csv', 'pe-2021-2.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2021-3-trimestre.csv', 'pe-2021-3.csv'),
     (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2021-4-trimestre.csv', 'pe-2021-4.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2022-1.csv',           'pe-2022-1.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2022-2.csv',           'pe-2022-2.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2022-3.csv',           'pe-2022-3.csv'),
     (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2022-4.csv',           'pe-2022-4.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2023-1.csv',           'pe-2023-1.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2023-2.csv',           'pe-2023-2.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2023-3.csv',           'pe-2023-3.csv'),
     (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2023-4.csv',           'pe-2023-4.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2024-1.csv',           'pe-2024-1.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2024-2.csv',           'pe-2024-2.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2024-3.csv',           'pe-2024-3.csv'),
     (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2024-4.csv',           'pe-2024-4.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2025-1.csv',           'pe-2025-1.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2025-2.csv',           'pe-2025-2.csv'),
+    (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2025-3.csv',           'pe-2025-3.csv'),
     (f'{BA}/presupuesto-ejecutado/presupuesto-ejecutado-2025-4.csv',           'pe-2025-4.csv'),
     # CSV ejecutado 2026 trimestres parciales (1T disponible; 2T/3T/4T en orden de publicación
     # — las que no existan aún devolverán 404 y se ignoran; cuando se publiquen, se descargan
