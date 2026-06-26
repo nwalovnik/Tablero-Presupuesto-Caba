@@ -752,13 +752,15 @@ function buildPeriodOptions(){
     const trims = d.trims || {};
     const qs = Object.keys(trims).map(Number).sort((a,b)=>b-a);
     qs.forEach(q => {
-      const suffix = (y===SANC_YEAR) ? ' (provisorio)' : '';
-      items.push({value: `${y}-ejec-${q}T`, label: `${y} · Ejecutado al ${TRIM_LBL[q]} trimestre${suffix}`});
+      // El dato trimestral sale del CSV oficial de BA Data (devengado acumulado),
+      // igual que cualquier otro año — no es "provisorio". La ejecución definitiva
+      // es la Cuenta de Inversión, que para 2026 recién sale a mediados de 2027.
+      items.push({value: `${y}-ejec-${q}T`, label: `${y} · Ejecutado al ${TRIM_LBL[q]} trimestre`});
     });
-    // Compat 2026: si no hay trims pero sí provisorio_csv
+    // Compat 2026: si no hay trims pero sí provisorio_csv (mismo CSV de BA Data)
     if(!qs.length && d.provisorio_csv){
       const q = d.provisorio_csv.trimestre || 1;
-      items.push({value: `${y}-ejec-${q}T`, label: `${y} · Ejecutado al ${TRIM_LBL[q]} trimestre (provisorio)`});
+      items.push({value: `${y}-ejec-${q}T`, label: `${y} · Ejecutado al ${TRIM_LBL[q]} trimestre`});
     }
     groups.push({year: y, items});
   });
@@ -839,7 +841,7 @@ function renderKpis(){
     : (isSanc?'Sancionado '+currentYear:'Devengado '+currentYear);
   const subPrincipal = (currentJur ? currentJur + ' · ' : '') + (showReal
     ? 'Pesos constantes 2019'
-    : (isSanc?'Proyecto Ley 6929':(isExecParcial?(currentYear===SANC_YEAR?'Acumulado · provisorio · CSV BA Data':'Acumulado al trimestre · CSV BA Data'):'Pesos corrientes')));
+    : (isSanc?'Proyecto Ley 6929':(isExecParcial?'Acumulado al trimestre · CSV BA Data':'Pesos corrientes')));
 
   // KPI secundario: con jurisdicción seleccionada muestra su participación en el
   // total CABA; sin filtro, el comportamiento clásico (Ministerios / % Ejecución).
@@ -891,6 +893,12 @@ function renderProvBanner(){
   if(!el) return;
   // El banner provisorio es un total CABA; con una jurisdicción filtrada confundiría.
   if(currentJur || typeof EJEC_PROV === 'undefined' || !EJEC_PROV || EJEC_PROV.year !== currentYear){
+    el.style.display = 'none'; return;
+  }
+  // El banner viene del PDF de la Contaduría (estimación previa). Una vez que sale
+  // el CSV oficial de BA Data para ese trimestre, ese dato ya está en el tablero y
+  // el banner provisorio sólo confundiría: lo ocultamos.
+  if(!EJEC_PROV.definitivo && trimData(currentYear, EJEC_PROV.trim)){
     el.style.display = 'none'; return;
   }
   const trim = EJEC_PROV.trim;
@@ -951,7 +959,7 @@ function renderEvol(){
     data:{labels:yearsList.map(y=>isTrimMode?`${TRIM_LBL[q]}T ${y}`:String(y)),datasets},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:'bottom'},
-        tooltip:{callbacks:{label:c=>c.dataset.label+': $'+fmtMoney(c.parsed.y)+((c.dataIndex===lastIdx)?(isTrimMode?(yearsList[lastIdx]===SANC_YEAR?' (provisorio)':''):' (sancionado)'):'')}}},
+        tooltip:{callbacks:{label:c=>c.dataset.label+': $'+fmtMoney(c.parsed.y)+((c.dataIndex===lastIdx && !isTrimMode)?' (sancionado)':'')}}},
       scales:{y:{ticks:{callback:v=>'$'+fmtMoney(v)},title:{display:showReal,text:'Pesos constantes 2019',font:{size:10}}}}
     }
   });
@@ -1115,7 +1123,7 @@ function renderSparcEvolution(concept){
         legend: {display: false},
         tooltip: {callbacks: {
           label: c => '$' + fmtMoney(c.parsed.y) + (showReal?' (pesos 2019)':''),
-          afterLabel: c => (c.dataIndex===lastIdx && yearsList[lastIdx]===SANC_YEAR) ? (q===null ? '⚠ 2026 ejecutado parcial (1T)' : '⚠ 2026 provisorio') : ''
+          afterLabel: c => (c.dataIndex===lastIdx && yearsList[lastIdx]===SANC_YEAR && q===null) ? '⚠ 2026 ejecutado parcial (1T)' : ''
         }}
       },
       scales: {
