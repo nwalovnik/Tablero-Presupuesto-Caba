@@ -183,6 +183,14 @@ def agg_records(records, amount_key='devengado'):
     vig_by_jur = defaultdict(float)
     jur_prog = defaultdict(float)   # (jur, prog) -> amount
     jur_fin = defaultdict(float)    # (jur, fin) -> amount
+    # Desglose completo por jurisdicción: permite que al filtrar un ministerio
+    # en el front se recalculen TODOS los gráficos (finalidad/inciso/programa/
+    # concepto) para esa jurisdicción, sin recortes a nivel agregado.
+    def _new_detail():
+        return {'totals': {'sancion':0.0,'vigente':0.0,'devengado':0.0},
+                'by_fin': defaultdict(float), 'by_inc': defaultdict(float),
+                'by_prog': defaultdict(float), 'by_sparc': defaultdict(float)}
+    jur_detail = defaultdict(_new_detail)
     for r in records:
         amt = r.get(amount_key,0.0)
         totals['devengado'] += r.get('devengado',0.0)
@@ -204,6 +212,26 @@ def agg_records(records, amount_key='devengado'):
                 sparc_meta[sp] = i
         if j and p: jur_prog[j+'||'+p] += amt
         if j and f: jur_fin[j+'||'+f] += amt
+        if j:
+            jd = jur_detail[j]
+            jd['totals']['devengado'] += r.get('devengado',0.0)
+            jd['totals']['vigente'] += r.get('vigente',0.0)
+            jd['totals']['sancion'] += r.get('sancion',0.0)
+            if f: jd['by_fin'][f] += amt
+            if i: jd['by_inc'][i] += amt
+            if p: jd['by_prog'][p] += amt
+            if sp: jd['by_sparc'][sp] += amt
+    # Compactar el detalle por jurisdicción: fin/inc son pocos (se guardan
+    # enteros), prog/sparc se recortan a top-15 por jurisdicción para acotar tamaño.
+    jur_detail_out = {}
+    for j, jd in jur_detail.items():
+        jur_detail_out[j] = {
+            'totals': jd['totals'],
+            'by_fin': dict(jd['by_fin']),
+            'by_inc': dict(jd['by_inc']),
+            'by_prog': dict(sorted(jd['by_prog'].items(), key=lambda x:-x[1])[:15]),
+            'by_sparc': dict(sorted(jd['by_sparc'].items(), key=lambda x:-x[1])[:15]),
+        }
     return {
         'totals': totals,
         'by_jur': dict(by_jur),
@@ -216,6 +244,7 @@ def agg_records(records, amount_key='devengado'):
         'vig_by_jur': dict(vig_by_jur),
         'jur_prog': dict(jur_prog),
         'jur_fin': dict(jur_fin),
+        'jur_detail': jur_detail_out,
     }
 
 # Esquema viejo (CSVs trimestrales 2013-2015): no trae descripción de finalidad,
@@ -350,6 +379,7 @@ def main():
             'by_inc': agg26_exec['by_inc'],
             'by_sparc': agg26_exec['by_sparc'],
             'sparc_inc': agg26_exec.get('sparc_inc', {}),
+            'jur_detail': agg26_exec.get('jur_detail', {}),
             'source': f'pe-{YEAR_SANC}-{q}.csv (BA Data)',
         }
 
@@ -381,6 +411,7 @@ def main():
             'by_prog': dict(sorted(agg['by_prog'].items(), key=lambda x: -x[1])[:30]),
             'by_sparc': top_sparc,
             'sparc_inc': {k: v for k, v in agg.get('sparc_inc', {}).items() if k in top_sparc},
+            'jur_detail': agg.get('jur_detail', {}),
         }
 
     for y in YEARS:
@@ -453,17 +484,27 @@ def main():
         s = ' '.join(s.split())
         return s
     # Build canonical map: pick variant with most accented chars (richest form)
+    def _jur_sources(d):
+        srcs = [d]
+        if 'provisorio_csv' in d: srcs.append(d['provisorio_csv'])
+        srcs.extend(d.get('trims', {}).values())
+        return srcs
     variants = defaultdict(set)
     for y in YEARS:
-        for jur in result['data'][str(y)].get('by_jur', {}):
-            variants[norm_jur(jur)].add(jur)
-        for t in result['data'][str(y)].get('trims', {}).values():
-            for jur in t.get('by_jur', {}):
+        for src in _jur_sources(result['data'][str(y)]):
+            for jur in src.get('by_jur', {}):
+                variants[norm_jur(jur)].add(jur)
+            for jur in src.get('jur_detail', {}):
                 variants[norm_jur(jur)].add(jur)
     canonical = {}
     for k, vs in variants.items():
         # prefer variant with accents (more complete)
         canonical[k] = max(vs, key=lambda x: sum(1 for c in x if unicodedata.category(c) == 'Mn' or c in 'áéíóúÁÉÍÓÚñÑ'))
+    def _merge_detail(dst, src):
+        for kk in ('totals','by_fin','by_inc','by_prog','by_sparc'):
+            for kx, vx in src.get(kk, {}).items():
+                dst.setdefault(kk, defaultdict(float))
+                dst[kk][kx] += vx
     # Apply canonicalization across all dimensions that use jur as key
     for y in YEARS:
         d = result['data'][str(y)]
@@ -483,6 +524,18 @@ def main():
             for jur, v in t.get('by_jur', {}).items():
                 new[canonical[norm_jur(jur)]] += v
             t['by_jur'] = dict(new)
+        # jur_detail: canonicalizar las claves de jurisdicción (mergeando si colapsan)
+        for src in _jur_sources(d):
+            jd = src.get('jur_detail')
+            if not jd: continue
+            merged = {}
+            for jur, detail in jd.items():
+                cj = canonical[norm_jur(jur)]
+                if cj not in merged:
+                    merged[cj] = {}
+                _merge_detail(merged[cj], detail)
+            # defaultdict(float) -> dict
+            src['jur_detail'] = {j: {kk: dict(vv) for kk, vv in det.items()} for j, det in merged.items()}
     # Deduplicate conceptos Sparc con diferencias tipográficas (tildes), igual que jur:
     # sin esto la serie histórica de un concepto se parte en dos claves distintas
     # (ej. "Productos Farmaceuticos" 2019-2023 vs "Productos Farmacéuticos" resto).
@@ -496,6 +549,9 @@ def main():
         for src in _sparc_sources(result['data'][str(y)]):
             for sp in src.get('by_sparc', {}):
                 sp_variants[norm_jur(sp)].add(sp)
+            for det in src.get('jur_detail', {}).values():
+                for sp in det.get('by_sparc', {}):
+                    sp_variants[norm_jur(sp)].add(sp)
     sp_canon = {}
     for k, vs in sp_variants.items():
         sp_canon[k] = max(vs, key=lambda x: sum(1 for c in x if unicodedata.category(c) == 'Mn' or c in 'áéíóúÁÉÍÓÚñÑ'))
@@ -508,6 +564,12 @@ def main():
                 src['by_sparc'] = dict(new)
             if 'sparc_inc' in src:
                 src['sparc_inc'] = {sp_canon[norm_jur(sp)]: v for sp, v in src['sparc_inc'].items()}
+            for det in src.get('jur_detail', {}).values():
+                if 'by_sparc' in det:
+                    new = defaultdict(int)
+                    for sp, v in det['by_sparc'].items():
+                        new[sp_canon[norm_jur(sp)]] += v
+                    det['by_sparc'] = dict(new)
     # limit by_prog top 30, by_sparc top 50, keep by_jur/fin full, jur_prog full (filters)
     for y in YEARS:
         d = result['data'][str(y)]
