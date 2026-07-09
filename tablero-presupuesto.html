@@ -168,6 +168,12 @@ body{padding-top:72px}
 .card h3{font-family:var(--disp);font-weight:800;font-size:16px;text-transform:uppercase;letter-spacing:.02em;color:var(--navy);line-height:1.1}
 .card-sub{font-size:11px;color:var(--gray500);margin-top:3px}
 .card-tag{font-size:10px;font-weight:700;background:var(--gray100);color:var(--gray700);padding:3px 8px;border-radius:4px;letter-spacing:.08em;white-space:nowrap}
+/* Botón de descarga CSV por tarjeta */
+.dl{margin-top:12px;align-self:flex-end;display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:11px;font-weight:700;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--gray500);background:transparent;border:1px solid var(--gray200);
+  border-radius:7px;padding:6px 11px;cursor:pointer;transition:.13s}
+.dl:hover{color:var(--blue);border-color:var(--blue);background:rgba(27,110,194,.05)}
+.dl svg{width:13px;height:13px}
 
 /* Chart containers: fixed mobile-safe heights */
 .ch{position:relative;width:100%;height:260px}
@@ -1461,10 +1467,89 @@ function renderAll(){
   };
 })();
 
+// ───── Descarga de datos en CSV ─────
+// Exporta lo que se está viendo (respeta año/período/jurisdicción/nominal-real),
+// con números crudos (no abreviados) para poder reanalizarlos en Excel/Python.
+function _csvCtx(){
+  const q = currentTrimNum();
+  const per = q!==null ? `ejec-${q}T`
+            : (currentYear===SANC_YEAR ? 'sancionado' : 'ejecutado-cierre');
+  const modo = showReal ? 'real-pesos2019' : 'nominal';
+  const jur = currentJur ? '_' + _slug(currentJur) : '';
+  return {per, modo, jur, colVal: showReal ? 'Monto (pesos constantes 2019)' : 'Monto (pesos corrientes)'};
+}
+function _slug(s){
+  return s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase()
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40);
+}
+function _csvCell(v){
+  if(v===null || v===undefined || v==='') return '';
+  if(typeof v === 'number') return String(Math.round(v));
+  const s = String(v);
+  return /[",;\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+function downloadCSV(filename, header, rows){
+  const lines = [header, ...rows].map(r => r.map(_csvCell).join(','));
+  const blob = new Blob(['﻿'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 100);
+  toast('CSV descargado');
+}
+// Exporta un gráfico Chart.js: primera columna = categoría, una columna por serie.
+function exportChart(canvasId, slug){
+  const ch = Chart.getChart(canvasId);
+  if(!ch){ toast('Nada para exportar'); return; }
+  const ctx = _csvCtx();
+  const labels = ch.data.labels || [];
+  const ds = ch.data.datasets || [];
+  const multi = ds.length > 1;
+  const header = ['Categoría', ...ds.map(d => d.label && multi ? d.label : ctx.colVal)];
+  const rows = labels.map((lb,i) => [lb, ...ds.map(d => (d.data||[])[i])]);
+  downloadCSV(`presupuesto_caba_${slug}_${currentYear}_${ctx.per}_${ctx.modo}${ctx.jur}.csv`, header, rows);
+}
+// Exporta la tabla de jurisdicciones desde el modelo (no del DOM abreviado).
+function exportJurTable(){
+  const d = currentData(); const ctx = _csvCtx();
+  const isExecParcial = currentPeriod !== 'default';
+  const tot = isExecParcial ? (d.totals.devengado||0) : amountOf(currentYear);
+  const ent = Object.entries(d.by_jur||{}).sort((a,b)=>b[1]-a[1]);
+  const header = ['Jurisdicción', ctx.colVal, '% del total', 'Vigente (pesos corrientes)', 'Ejecución %'];
+  const rows = ent.map(([k,v])=>{
+    const vig = (d.vig_by_jur||{})[k] || 0;
+    const disp = showReal ? deflact(v, currentYear) : v;
+    return [k, disp, (v/tot*100).toFixed(2), vig || '', vig ? (v/vig*100).toFixed(1) : ''];
+  });
+  downloadCSV(`presupuesto_caba_jurisdicciones-tabla_${currentYear}_${ctx.per}_${ctx.modo}.csv`, header, rows);
+}
+function _makeDlBtn(onclick){
+  const b = document.createElement('button');
+  b.className = 'dl'; b.type = 'button';
+  b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/></svg><span>CSV</span>';
+  b.onclick = onclick;
+  return b;
+}
+function setupCSV(){
+  const map = {chEvol:'evolucion', chFin:'finalidad', chJur:'jurisdicciones',
+    chInc:'inciso', chProg:'programas', chFilt:'explorador', chSparc:'conceptos'};
+  Object.keys(map).forEach(id=>{
+    const cv = document.getElementById(id);
+    if(!cv) return;
+    const card = cv.closest('.card');
+    if(card && !card.querySelector('.dl')) card.appendChild(_makeDlBtn(()=>exportChart(id, map[id])));
+  });
+  const tj = document.getElementById('tblJur');
+  if(tj){ const card = tj.closest('.card');
+    if(card && !card.querySelector('.dl')) card.appendChild(_makeDlBtn(exportJurTable)); }
+}
+
 renderAll();
 renderFiltro();
 initGlobalJurSelect();
 renderIpcAudit();
+setupCSV();
 
 // === Calendario de publicaciones — vista mensual estilo macro + lista ===
 (function(){
