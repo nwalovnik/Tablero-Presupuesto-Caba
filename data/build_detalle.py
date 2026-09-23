@@ -103,18 +103,29 @@ def write_detalle(year, period_key, rows):
         w.writerow(line)
         n += 1
     data = buf.getvalue().encode('utf-8')
-    gz = gzip.compress(data, 9)
     fname = f'detalle_{year}_{period_key}.csv.gz'
-    with open(os.path.join(OUT_DIR, fname), 'wb') as f:
+    path = os.path.join(OUT_DIR, fname)
+    # Si el contenido no cambió, no reescribir: el .gz guarda un timestamp en el
+    # encabezado y reescribirlo haría que git vea los 54 archivos cambiados en cada
+    # corrida del CI (≈37 MB nuevos por día en el historial).
+    if os.path.exists(path):
+        try:
+            with gzip.open(path, 'rb') as f:
+                if f.read() == data:
+                    print(f'  {fname}: sin cambios ({n:,} filas)', flush=True)
+                    return fname, n
+        except Exception:
+            pass
+    gz = gzip.compress(data, 9, mtime=0)  # mtime fijo → salida determinística
+    with open(path, 'wb') as f:
         f.write(gz)
-    print(f'  {fname}: {n:,} filas | {len(gz)/1e6:.2f} MB gz', flush=True)
+    print(f'  {fname}: {n:,} filas | {len(gz)/1e6:.2f} MB gz (escrito)', flush=True)
     return fname, n
 
 
 def main():
-    manifest = {'generado': None, 'archivos': {}}
-    from datetime import datetime, timezone
-    manifest['generado'] = datetime.now(timezone.utc).isoformat(timespec='seconds')
+    # Sin timestamp: el manifest sólo cambia cuando cambian los archivos disponibles.
+    manifest = {'archivos': {}}
     total = 0
     for y in bb.YEARS:
         # Período principal: cierre anual (o sancionado para el año de proyecto)
@@ -125,7 +136,9 @@ def main():
         except Exception as e:
             print(f'  {y} default: SKIP ({type(e).__name__}: {e})', flush=True)
         # Trimestres parciales (acumulado al trimestre)
-        quarters = (1,) if y == bb.YEAR_SANC else (1, 2, 3)
+        # Año en curso: todos los trimestres que existan (el 4T es su futuro cierre);
+        # años cerrados: 1T-3T (el 4T es el cierre anual = 'default').
+        quarters = (1, 2, 3, 4) if y == bb.YEAR_SANC else (1, 2, 3)
         for q in quarters:
             try:
                 rows = load_rows(y, q)

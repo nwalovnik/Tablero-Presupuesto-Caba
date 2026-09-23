@@ -589,5 +589,17 @@ def main():
         json.dump(result, f, ensure_ascii=False, separators=(',',':'))
     print(f'Wrote {OUT} ({os.path.getsize(OUT):,} bytes)')
 
+    # En CI (GitHub Actions): regenerar el detalle línea por línea (descarga
+    # "Detalle completo" del tablero) y dejarlo staged para que el paso de commit
+    # del workflow lo incluya. Se hace desde acá y no como paso propio del workflow
+    # porque el token de automatización no tiene permiso para editar el .yml.
+    # Localmente no corre (tarda varios minutos): usar `python data/build_detalle.py`.
+    if os.environ.get('GITHUB_ACTIONS'):
+        import subprocess
+        repo = os.path.join(DATA_DIR, '..')
+        print('CI: generando detalle línea por línea...', flush=True)
+        subprocess.run([sys.executable, os.path.join(DATA_DIR, 'build_detalle.py')], check=False)
+        subprocess.run(['git', 'add', 'detalle', 'data/build_detalle.py'], cwd=repo, check=False)
+
 if __name__ == '__main__':
     main()
