@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
   --navy:#0C2340; --sky:#6AADE4; --blue:#1B6EC2;
@@ -174,6 +175,21 @@ body{padding-top:72px}
   border-radius:7px;padding:6px 11px;cursor:pointer;transition:.13s}
 .dl:hover{color:var(--blue);border-color:var(--blue);background:rgba(27,110,194,.05)}
 .dl svg{width:13px;height:13px}
+/* Barra de descargas global */
+.dlbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  background:linear-gradient(180deg,#fff,var(--gray50));border:1px solid var(--gray200);border-radius:12px;padding:12px 16px;margin-top:8px}
+.dlbar-lbl{font-size:12px;color:var(--gray500);letter-spacing:.02em}
+.dlbar-lbl b{color:var(--navy);font-weight:800}
+.dlbar-btns{display:flex;gap:9px;flex-wrap:wrap}
+.dlbig{display:inline-flex;align-items:center;gap:8px;font:inherit;font-size:12.5px;font-weight:800;letter-spacing:.02em;
+  color:#fff;background:var(--blue);border:none;border-radius:9px;padding:9px 14px;cursor:pointer;transition:.14s;white-space:nowrap}
+.dlbig:hover{background:var(--navy)}
+.dlbig.alt{background:#fff;color:var(--navy);border:1.5px solid var(--gray300)}
+.dlbig.alt:hover{border-color:var(--blue);color:var(--blue);background:rgba(27,110,194,.05)}
+.dlbig:disabled{opacity:.5;cursor:default;background:var(--gray100);color:var(--gray500);border-color:var(--gray200)}
+.dlbig svg{width:15px;height:15px}
+.dlbig .spin{width:15px;height:15px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:dlspin .7s linear infinite}
+@keyframes dlspin{to{transform:rotate(360deg)}}
 
 /* Chart containers: fixed mobile-safe heights */
 .ch{position:relative;width:100%;height:260px}
@@ -326,6 +342,21 @@ tr.trow.sel:hover{background:rgba(192,106,0,.16)}
   <div class="kpis" id="kpis"></div>
   <!-- Banner de ejecución provisoria (visible solo cuando hay datos para el año) -->
   <div id="provBanner" class="prov-banner" style="display:none"></div>
+
+  <!-- Barra de descargas · respeta el filtro activo (jurisdicción + período) -->
+  <div class="dlbar" id="dlbar">
+    <div class="dlbar-lbl">Descargar <b id="dlScope">todo el presupuesto</b></div>
+    <div class="dlbar-btns">
+      <button class="dlbig" id="dlResumen" type="button" title="Excel con todas las aperturas que muestra el tablero (jurisdicción, finalidad, inciso, programas, conceptos)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/></svg>
+        <span>Resumen · Excel</span>
+      </button>
+      <button class="dlbig alt" id="dlDetalle" type="button" title="Todas las partidas línea por línea (máxima desagregación) para pivotear en Excel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/></svg>
+        <span>Detalle completo · CSV</span>
+      </button>
+    </div>
+  </div>
 
   <!-- Evolución + Composición finalidad -->
   <div class="grid g2 section" style="margin-top:8px">
@@ -1448,6 +1479,7 @@ function renderAll(){
   renderSparc();
   renderTblJur();
   if(filtroApply) filtroApply();
+  if(window._updateDlScope) _updateDlScope();
 }
 
 // ───── Toggle nominal / real ─────
@@ -1466,6 +1498,22 @@ function renderAll(){
     renderAll();
   };
 })();
+
+// ───── Aviso flotante (toast) autónomo ─────
+function toast(msg){
+  let el = document.getElementById('_toast');
+  if(!el){
+    el = document.createElement('div'); el.id = '_toast';
+    el.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(8px);'+
+      'background:#0C2340;color:#fff;font:600 13px/1.3 system-ui,sans-serif;padding:10px 16px;border-radius:24px;'+
+      'box-shadow:0 12px 30px -12px rgba(0,0,0,.5);z-index:9999;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;max-width:90vw;text-align:center';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  requestAnimationFrame(()=>{ el.style.opacity='1'; el.style.transform='translateX(-50%) translateY(0)'; });
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateX(-50%) translateY(8px)'; }, 1900);
+}
 
 // ───── Descarga de datos en CSV ─────
 // Exporta lo que se está viendo (respeta año/período/jurisdicción/nominal-real),
@@ -1545,11 +1593,123 @@ function setupCSV(){
     if(card && !card.querySelector('.dl')) card.appendChild(_makeDlBtn(exportJurTable)); }
 }
 
+// ───── Descargas globales: Resumen (Excel multi-hoja) + Detalle línea por línea ─────
+const _periodoTxt = () => {
+  const q = currentTrimNum();
+  if(q!==null) return `${TRIM_LBL[q]} trimestre ${currentYear}`;
+  return currentYear===SANC_YEAR ? `Sancionado ${currentYear}` : `Ejecutado ${currentYear} (cierre)`;
+};
+const _dispVal = v => showReal ? deflact(v, currentYear) : v;
+const _modoTxt = () => showReal ? 'Pesos constantes 2019 (real, IPCBA)' : 'Pesos corrientes (nominal)';
+
+// —— Resumen: workbook con todas las aperturas del tablero para el filtro activo ——
+function exportResumenExcel(){
+  if(typeof XLSX === 'undefined'){ toast('Cargando módulo Excel…'); return; }
+  const base = currentData();          // período completo (para ranking de jurisdicciones)
+  const d = scopedData();              // acotado a la jurisdicción si hay filtro
+  const wb = XLSX.utils.book_new();
+  const colMonto = showReal ? 'Monto (pesos 2019)' : 'Monto (pesos corrientes)';
+  // Hoja Resumen
+  const meta = [
+    ['Tablero Presupuesto CABA — Resumen'],
+    ['Período', _periodoTxt()],
+    ['Jurisdicción', currentJur || 'Toda la CABA'],
+    ['Valores', _modoTxt()],
+    ['Fuente', 'BA Data · Min. de Economía y Finanzas GCBA'],
+    ['Generado', new Date().toLocaleString('es-AR')],
+    [],
+    ['Total sancionado', Math.round(_dispVal(d.totals.sancion||0))],
+    ['Total vigente', Math.round(_dispVal(d.totals.vigente||0))],
+    ['Total devengado', Math.round(_dispVal(d.totals.devengado||0))],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(meta), 'Resumen');
+  const sheetFrom = (obj, c1) => {
+    const ent = Object.entries(obj||{}).sort((a,b)=>b[1]-a[1]);
+    return XLSX.utils.aoa_to_sheet([[c1, colMonto], ...ent.map(([k,v])=>[k, Math.round(_dispVal(v))])]);
+  };
+  if(!currentJur) XLSX.utils.book_append_sheet(wb, sheetFrom(base.by_jur, 'Jurisdicción'), 'Jurisdicciones');
+  XLSX.utils.book_append_sheet(wb, sheetFrom(d.by_fin, 'Finalidad'), 'Finalidad');
+  XLSX.utils.book_append_sheet(wb, sheetFrom(d.by_inc, 'Inciso'), 'Inciso');
+  XLSX.utils.book_append_sheet(wb, sheetFrom(d.by_prog, 'Programa'), 'Programas');
+  XLSX.utils.book_append_sheet(wb, sheetFrom(d.by_sparc, 'Concepto (Subparcial)'), 'Conceptos');
+  const ctx = _csvCtx();
+  XLSX.writeFile(wb, `presupuesto_caba_resumen_${currentYear}_${ctx.per}_${ctx.modo}${ctx.jur}.xlsx`);
+  toast('Excel descargado');
+}
+
+// —— Detalle línea por línea: baja el .csv.gz del período, lo descomprime y filtra ——
+let _dlManifest = null;
+function _detalleKey(){ return `${currentYear}_${currentPeriod}`; }
+function _detalleAvailable(){
+  return _dlManifest && _dlManifest.archivos && _dlManifest.archivos[_detalleKey()];
+}
+const _normJ = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'')
+  .toLowerCase().replace(/[.,]/g,' ').replace(/\s+/g,' ').trim();
+function _firstField(line){
+  if(line[0] !== '"') { const i = line.indexOf(','); return i<0 ? line : line.slice(0,i); }
+  let out=''; for(let i=1;i<line.length;i++){ const c=line[i];
+    if(c==='"'){ if(line[i+1]==='"'){ out+='"'; i++; } else break; } else out+=c; }
+  return out;
+}
+async function exportDetalleCSV(btn){
+  const key = _detalleKey();
+  const info = _detalleAvailable();
+  if(!info){ toast('Detalle no disponible para este período'); return; }
+  if(typeof DecompressionStream === 'undefined'){ toast('Tu navegador no soporta descompresión — actualizalo'); return; }
+  const span = btn.querySelector('span'), svg = btn.querySelector('svg');
+  const restore = () => { btn.disabled=false; if(svg)svg.style.display=''; const s=btn.querySelector('.spin'); if(s)s.remove(); span.textContent='Detalle completo · CSV'; };
+  btn.disabled=true; if(svg)svg.style.display='none';
+  btn.insertBefore(Object.assign(document.createElement('span'),{className:'spin'}), span);
+  span.textContent = 'Bajando…';
+  try{
+    const resp = await fetch(`detalle/${info.archivo}`);
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    const stream = resp.body.pipeThrough(new DecompressionStream('gzip'));
+    const text = await new Response(stream).text();
+    let lines = text.split(/\r?\n/);
+    while(lines.length && lines[lines.length-1]==='') lines.pop();
+    const header = lines[0];
+    let body = lines.slice(1);
+    if(currentJur){
+      const target = _normJ(currentJur);
+      body = body.filter(l => _normJ(_firstField(l)) === target);
+    }
+    const ctx = _csvCtx();
+    const blob = new Blob(['﻿'+[header, ...body].join('\r\n')], {type:'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `presupuesto_caba_detalle_${currentYear}_${ctx.per}${ctx.jur}.csv`;
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 100);
+    toast(`Detalle descargado (${body.length.toLocaleString('es-AR')} partidas)`);
+  }catch(e){
+    console.warn('detalle', e); toast('No pude bajar el detalle');
+  }finally{ restore(); }
+}
+
+function _updateDlScope(){
+  const el = document.getElementById('dlScope');
+  if(el) el.textContent = currentJur ? currentJur : 'todo el presupuesto';
+  const btn = document.getElementById('dlDetalle');
+  if(btn){
+    const ok = !!_detalleAvailable();
+    btn.disabled = !ok;
+    btn.title = ok ? 'Todas las partidas línea por línea (máxima desagregación) para pivotear en Excel'
+                   : 'Detalle línea por línea todavía no disponible para este período';
+  }
+}
+function setupDownloads(){
+  document.getElementById('dlResumen').onclick = exportResumenExcel;
+  document.getElementById('dlDetalle').onclick = e => exportDetalleCSV(e.currentTarget);
+  fetch('detalle/manifest.json').then(r=>r.ok?r.json():null).then(m=>{ _dlManifest=m; _updateDlScope(); }).catch(()=>{});
+}
+
 renderAll();
 renderFiltro();
 initGlobalJurSelect();
 renderIpcAudit();
 setupCSV();
+setupDownloads();
 
 // === Calendario de publicaciones — vista mensual estilo macro + lista ===
 (function(){

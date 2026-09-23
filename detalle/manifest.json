@@ -1,0 +1,221 @@
+{
+"generado": "2026-09-23T16:28:37+00:00",
+"archivos": {
+"2013_default": {
+"archivo": "detalle_2013_default.csv.gz",
+"filas": 52829
+},
+"2013_ejec-1T": {
+"archivo": "detalle_2013_ejec-1T.csv.gz",
+"filas": 14852
+},
+"2013_ejec-2T": {
+"archivo": "detalle_2013_ejec-2T.csv.gz",
+"filas": 23149
+},
+"2013_ejec-3T": {
+"archivo": "detalle_2013_ejec-3T.csv.gz",
+"filas": 28045
+},
+"2014_default": {
+"archivo": "detalle_2014_default.csv.gz",
+"filas": 51506
+},
+"2014_ejec-1T": {
+"archivo": "detalle_2014_ejec-1T.csv.gz",
+"filas": 14729
+},
+"2014_ejec-2T": {
+"archivo": "detalle_2014_ejec-2T.csv.gz",
+"filas": 23165
+},
+"2014_ejec-3T": {
+"archivo": "detalle_2014_ejec-3T.csv.gz",
+"filas": 28029
+},
+"2015_default": {
+"archivo": "detalle_2015_default.csv.gz",
+"filas": 49222
+},
+"2015_ejec-1T": {
+"archivo": "detalle_2015_ejec-1T.csv.gz",
+"filas": 14904
+},
+"2015_ejec-2T": {
+"archivo": "detalle_2015_ejec-2T.csv.gz",
+"filas": 23609
+},
+"2015_ejec-3T": {
+"archivo": "detalle_2015_ejec-3T.csv.gz",
+"filas": 27686
+},
+"2016_default": {
+"archivo": "detalle_2016_default.csv.gz",
+"filas": 54725
+},
+"2016_ejec-1T": {
+"archivo": "detalle_2016_ejec-1T.csv.gz",
+"filas": 45539
+},
+"2016_ejec-2T": {
+"archivo": "detalle_2016_ejec-2T.csv.gz",
+"filas": 49607
+},
+"2016_ejec-3T": {
+"archivo": "detalle_2016_ejec-3T.csv.gz",
+"filas": 55690
+},
+"2017_default": {
+"archivo": "detalle_2017_default.csv.gz",
+"filas": 57673
+},
+"2017_ejec-1T": {
+"archivo": "detalle_2017_ejec-1T.csv.gz",
+"filas": 49447
+},
+"2017_ejec-2T": {
+"archivo": "detalle_2017_ejec-2T.csv.gz",
+"filas": 52489
+},
+"2017_ejec-3T": {
+"archivo": "detalle_2017_ejec-3T.csv.gz",
+"filas": 55477
+},
+"2018_default": {
+"archivo": "detalle_2018_default.csv.gz",
+"filas": 54384
+},
+"2018_ejec-1T": {
+"archivo": "detalle_2018_ejec-1T.csv.gz",
+"filas": 43198
+},
+"2018_ejec-2T": {
+"archivo": "detalle_2018_ejec-2T.csv.gz",
+"filas": 48801
+},
+"2018_ejec-3T": {
+"archivo": "detalle_2018_ejec-3T.csv.gz",
+"filas": 52053
+},
+"2019_default": {
+"archivo": "detalle_2019_default.csv.gz",
+"filas": 51705
+},
+"2019_ejec-1T": {
+"archivo": "detalle_2019_ejec-1T.csv.gz",
+"filas": 40597
+},
+"2019_ejec-2T": {
+"archivo": "detalle_2019_ejec-2T.csv.gz",
+"filas": 46207
+},
+"2019_ejec-3T": {
+"archivo": "detalle_2019_ejec-3T.csv.gz",
+"filas": 49492
+},
+"2020_default": {
+"archivo": "detalle_2020_default.csv.gz",
+"filas": 49493
+},
+"2020_ejec-1T": {
+"archivo": "detalle_2020_ejec-1T.csv.gz",
+"filas": 42142
+},
+"2020_ejec-2T": {
+"archivo": "detalle_2020_ejec-2T.csv.gz",
+"filas": 45811
+},
+"2020_ejec-3T": {
+"archivo": "detalle_2020_ejec-3T.csv.gz",
+"filas": 47784
+},
+"2021_default": {
+"archivo": "detalle_2021_default.csv.gz",
+"filas": 47660
+},
+"2021_ejec-1T": {
+"archivo": "detalle_2021_ejec-1T.csv.gz",
+"filas": 40143
+},
+"2021_ejec-2T": {
+"archivo": "detalle_2021_ejec-2T.csv.gz",
+"filas": 42424
+},
+"2021_ejec-3T": {
+"archivo": "detalle_2021_ejec-3T.csv.gz",
+"filas": 45592
+},
+"2022_default": {
+"archivo": "detalle_2022_default.csv.gz",
+"filas": 48259
+},
+"2022_ejec-1T": {
+"archivo": "detalle_2022_ejec-1T.csv.gz",
+"filas": 40764
+},
+"2022_ejec-2T": {
+"archivo": "detalle_2022_ejec-2T.csv.gz",
+"filas": 43370
+},
+"2022_ejec-3T": {
+"archivo": "detalle_2022_ejec-3T.csv.gz",
+"filas": 46374
+},
+"2023_default": {
+"archivo": "detalle_2023_default.csv.gz",
+"filas": 50999
+},
+"2023_ejec-1T": {
+"archivo": "detalle_2023_ejec-1T.csv.gz",
+"filas": 39361
+},
+"2023_ejec-2T": {
+"archivo": "detalle_2023_ejec-2T.csv.gz",
+"filas": 43716
+},
+"2023_ejec-3T": {
+"archivo": "detalle_2023_ejec-3T.csv.gz",
+"filas": 49864
+},
+"2024_default": {
+"archivo": "detalle_2024_default.csv.gz",
+"filas": 48511
+},
+"2024_ejec-1T": {
+"archivo": "detalle_2024_ejec-1T.csv.gz",
+"filas": 37791
+},
+"2024_ejec-2T": {
+"archivo": "detalle_2024_ejec-2T.csv.gz",
+"filas": 43409
+},
+"2024_ejec-3T": {
+"archivo": "detalle_2024_ejec-3T.csv.gz",
+"filas": 48102
+},
+"2025_default": {
+"archivo": "detalle_2025_default.csv.gz",
+"filas": 45439
+},
+"2025_ejec-1T": {
+"archivo": "detalle_2025_ejec-1T.csv.gz",
+"filas": 36926
+},
+"2025_ejec-2T": {
+"archivo": "detalle_2025_ejec-2T.csv.gz",
+"filas": 40648
+},
+"2025_ejec-3T": {
+"archivo": "detalle_2025_ejec-3T.csv.gz",
+"filas": 43622
+},
+"2026_default": {
+"archivo": "detalle_2026_default.csv.gz",
+"filas": 27652
+},
+"2026_ejec-1T": {
+"archivo": "detalle_2026_ejec-1T.csv.gz",
+"filas": 34830
+}
+}
+}
