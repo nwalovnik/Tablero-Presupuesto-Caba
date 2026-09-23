@@ -1662,7 +1662,7 @@ async function exportDetalleCSV(btn){
   btn.insertBefore(Object.assign(document.createElement('span'),{className:'spin'}), span);
   span.textContent = 'Bajando…';
   try{
-    const resp = await fetch(`detalle/${info.archivo}`);
+    const resp = await fetch(`detalle/${info.archivo}?r=${info.filas}`);  // versión → evita caché vieja tras una actualización
     if(!resp.ok) throw new Error('HTTP '+resp.status);
     const stream = resp.body.pipeThrough(new DecompressionStream('gzip'));
     const text = await new Response(stream).text();
@@ -1701,7 +1701,10 @@ function _updateDlScope(){
 function setupDownloads(){
   document.getElementById('dlResumen').onclick = exportResumenExcel;
   document.getElementById('dlDetalle').onclick = e => exportDetalleCSV(e.currentTarget);
-  fetch('detalle/manifest.json').then(r=>r.ok?r.json():null).then(m=>{ _dlManifest=m; _updateDlScope(); }).catch(()=>{});
+  // Siempre fresco: Pages cachea ~10 min y el manifest es lo que habilita el botón
+  // cuando el CI publica un período nuevo. Pesa ~5 KB.
+  fetch('detalle/manifest.json?t='+Date.now(), {cache:'no-store'})
+    .then(r=>r.ok?r.json():null).then(m=>{ _dlManifest=m; _updateDlScope(); }).catch(()=>{});
 }
 
 renderAll();
