@@ -215,6 +215,10 @@
 "2026_ejec-1T": {
 "archivo": "detalle_2026_ejec-1T.csv.gz",
 "filas": 34830
+},
+"2026_ejec-2T": {
+"archivo": "detalle_2026_ejec-2T.csv.gz",
+"filas": 38751
 }
 }
 }
