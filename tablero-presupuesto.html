@@ -121,6 +121,15 @@ body{padding-top:72px}
 .hero-sec .desc{font-size:11.5px;color:var(--gray600);line-height:1.4}
 .hero-sec.feature .lbl::after{content:'★ INTERACTIVO';font-size:9px;color:var(--warn);background:rgba(242,201,76,.15);padding:2px 6px;border-radius:4px;margin-left:8px;letter-spacing:.08em;vertical-align:middle}
 
+/* Acceso al explorador del Proyecto 2027 */
+.p27-cta{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:14px 0 6px;padding:16px 20px;border-radius:12px;text-decoration:none;color:#fff;
+  background:linear-gradient(120deg,#0C2340 0%,#1B4F8A 100%);box-shadow:0 6px 18px rgba(12,35,64,.16);transition:.2s}
+.p27-cta:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(12,35,64,.24)}
+.p27-cta .p27-tag{font-family:var(--disp);font-weight:800;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#0C2340;background:#F2C94C;padding:4px 9px;border-radius:6px;white-space:nowrap}
+.p27-cta .p27-txt{flex:1;min-width:220px;line-height:1.25}
+.p27-cta .p27-lbl{font-family:var(--disp);font-weight:900;font-size:clamp(17px,3.2vw,22px);text-transform:uppercase;letter-spacing:.02em}
+.p27-cta .p27-desc{font-size:12px;color:#C9D8EE;margin-top:3px}
+.p27-cta .p27-go{font-family:var(--disp);font-weight:800;font-size:13px;letter-spacing:.12em;text-transform:uppercase;border:1.5px solid rgba(255,255,255,.6);border-radius:8px;padding:8px 14px;white-space:nowrap}
 /* KPI clickable */
 .kpi.clickable{display:block;cursor:pointer;text-decoration:none;color:inherit;transition:.18s}
 .kpi.clickable:hover{border-color:var(--blue);transform:translateY(-2px);box-shadow:0 6px 14px rgba(27,110,194,.10)}
@@ -303,6 +312,14 @@ tr.trow.sel:hover{background:rgba(192,106,0,.16)}
     <a href="#sec-explorador" class="hero-sec feature"><div class="num">2</div><div><div class="lbl">Explorador</div><div class="desc">Filtrá por ministerio y programa para ver evolución 2013–26.</div></div></a>
     <a href="#sec-calendario" class="hero-sec"><div class="num">3</div><div><div class="lbl">Calendario</div><div class="desc">Próximas publicaciones oficiales del presupuesto CABA.</div></div></a>
   </div>
+
+  <!-- Acceso al explorador del Proyecto de Presupuesto 2027 (página aparte) -->
+  <a href="proyecto-2027.html" class="p27-cta">
+    <span class="p27-tag">Nuevo</span>
+    <span class="p27-txt"><span class="p27-lbl">Proyecto Presupuesto 2027 presentado por el GCBA</span>
+      <span class="p27-desc" style="display:block">Partida por partida contra 2026, 2025 y 2023, nominal y real, con las obras del Plan de Inversiones. Descargable.</span></span>
+    <span class="p27-go">Ver proyecto →</span>
+  </a>
 
   <!-- Year selector — FIXED bar visible en toda la página -->
   <div class="yr-row">
