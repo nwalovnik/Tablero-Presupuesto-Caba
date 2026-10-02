@@ -93,6 +93,18 @@ table.t .fin{font-size:10px;color:var(--gray500);display:block;font-weight:500;l
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:9px;font-size:12.5px;opacity:0;transition:.25s;pointer-events:none;z-index:200}
 .toast.on{opacity:1}
 .pie{border-top:1px solid var(--gray200);padding-top:12px;font-size:11.5px;color:var(--gray500);max-width:980px}.pie b{color:var(--gray700)}
+.row-h>div:first-child{flex:1;min-width:260px}
+.colpick{position:relative}
+.colpick>summary{list-style:none;cursor:pointer;font-size:11.5px;font-weight:700;border:1.5px solid var(--gray300);color:var(--navy);background:#fff;border-radius:8px;padding:6px 11px;white-space:nowrap;user-select:none}
+.colpick>summary::-webkit-details-marker{display:none}
+.colpick[open]>summary,.colpick>summary:hover{border-color:var(--blue);color:var(--blue)}
+.colpick .cp-panel{position:absolute;right:0;top:calc(100% + 6px);z-index:60;background:#fff;border:1px solid var(--gray200);border-radius:10px;box-shadow:0 10px 28px rgba(12,35,64,.16);padding:12px 14px;min-width:300px;display:grid;gap:10px}
+.cp-grp b{display:block;font-family:var(--disp);font-weight:800;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--gray500);margin-bottom:4px}
+.cp-grp label{display:flex;gap:7px;align-items:center;font-size:12px;padding:2px 0;cursor:pointer;white-space:nowrap}
+.cp-grp input{accent-color:var(--blue)}
+.cp-act{display:flex;gap:6px;border-top:1px solid var(--gray100);padding-top:8px}
+.cp-act button{font:inherit;font-size:11px;font-weight:700;border:0;background:var(--gray100);color:var(--navy);border-radius:6px;padding:5px 9px;cursor:pointer}
+.cp-act button:hover{background:#E3EEFB;color:var(--blue)}
 .met h4{font-family:var(--disp);font-weight:800;font-size:15px;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 4px;color:var(--blue)}
 .met p,.met li{font-size:12.5px;color:var(--gray700);max-width:900px}
 .met ul{padding-left:18px}
@@ -134,7 +146,7 @@ table.t .fin{font-size:10px;color:var(--gray500);display:block;font-weight:500;l
     <div class="kpis" id="kpis"></div>
     <div class="note warn" id="warnBox" style="display:none"></div>
     <div class="card">
-      <div class="row-h"><div><h3 id="tblTitle">Partidas</h3><div class="sub" id="tblSub"></div></div></div>
+      <div class="row-h"><div><h3 id="tblTitle">Partidas</h3><div class="sub" id="tblSub"></div></div><details class="colpick" id="cpPart"></details></div>
       <div class="tw"><table class="t" id="tbl"></table></div>
       <div class="sm" style="margin-top:6px">Clic en el nombre para ver la serie histórica y abrir la partida por otra dimensión. Clic en los encabezados para ordenar.</div>
     </div>
@@ -176,8 +188,8 @@ table.t .fin{font-size:10px;color:var(--gray500);display:block;font-weight:500;l
     </div>
     <div class="kpis" id="oKpis"></div>
     <div class="card">
-      <h3>Plan Plurianual de Inversiones 2027-2029</h3>
-      <div class="sub" id="oSub"></div>
+      <div class="row-h"><div><h3>Plan Plurianual de Inversiones 2027-2029</h3>
+      <div class="sub" id="oSub"></div></div><details class="colpick" id="cpObras"></details></div>
       <div class="tw" style="max-height:700px"><table class="t" id="oTbl"></table></div>
       <div class="note">El 2026, el 2025 y el 2023 se cruzan por código (jurisdicción-programa-proyecto, y actividad-obra en el nivel obra) con la ejecución publicada en BA Data e incluyen todo el gasto imputado al proyecto (todos los incisos). Si el proyecto cambió de código, aparece sin base ("nuevo"). 2028 y 2029 van en nominal porque no hay proyección de inflación para esos años.</div>
     </div>
@@ -284,6 +296,7 @@ function rowCalc(n27, h) {
   r.max = S.unit === 'nom' ? null : mx; r.maxY = my; r.vmax = mx ? realAlways(n27, 2027) / mx - 1 : null;
   r.serie = YH.map(y => g(h.d, String(y)));
   r.v26raw = g(h.v, '2026V'); r.s26raw = g(h.s, '2026S'); r.d26raw = g(h.d, '2026V');
+  r.r27 = realAlways(n27, 2027); r.nb26 = raw26; r.rb26 = raw26; r.nb25 = raw25; r.rb25 = realAlways(raw25, 2025); r.nb23 = raw23; r.rb23 = realAlways(raw23, 2023);
   return r;
 }
 function buildRows() {
@@ -343,18 +356,62 @@ document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
   renderAll();
 });
 
+// ---------- selector de columnas ----------
+// cat: [{k, l (texto o función), g (grupo), def (visible por defecto)}]
+function colPicker(id, cat, store, onChange) {
+  const el = document.getElementById(id);
+  let on;
+  try {on = JSON.parse(localStorage.getItem(store) || 'null');} catch (e) {on = null;}
+  if (!Array.isArray(on)) on = cat.filter(c => c.def).map(c => c.k);
+  const st = {on: new Set(on)};
+  const save = () => {try {localStorage.setItem(store, JSON.stringify([...st.on]));} catch (e) {}};
+  const lbl = c => typeof c.l === 'function' ? c.l() : c.l;
+  const draw = () => {
+    const grupos = [...new Set(cat.map(c => c.g))];
+    el.innerHTML = `<summary>☰ Columnas (${cat.filter(c => st.on.has(c.k)).length}/${cat.length}) ▾</summary><div class="cp-panel">` +
+      grupos.map(g => `<div class="cp-grp"><b>${g}</b>${cat.filter(c => c.g === g).map(c => `<label><input type="checkbox" data-k="${c.k}" ${st.on.has(c.k) ? 'checked' : ''}>${lbl(c)}</label>`).join('')}</div>`).join('') +
+      `<div class="cp-act"><button data-a="def">Solo variaciones</button><button data-a="all">Todas</button></div></div>`;
+    el.querySelectorAll('input').forEach(i => i.onchange = () => {i.checked ? st.on.add(i.dataset.k) : st.on.delete(i.dataset.k); save(); refresh(); onChange();});
+    el.querySelectorAll('.cp-act button').forEach(b => b.onclick = e => {e.preventDefault();
+      st.on = new Set(b.dataset.a === 'all' ? cat.map(c => c.k) : cat.filter(c => c.def).map(c => c.k)); save(); draw(); el.open = true; onChange();});
+  };
+  const refresh = () => {el.querySelector('summary').textContent = `☰ Columnas (${cat.filter(c => st.on.has(c.k)).length}/${cat.length}) ▾`;};
+  draw();
+  document.addEventListener('click', e => {if (el.open && !el.contains(e.target)) el.open = false;});
+  return {visible: () => cat.filter(c => st.on.has(c.k)), redraw: draw};
+}
+
 // ---------- PARTIDAS ----------
 let chVar, chSerie, chRec;
-const COLS = [
-  ['nm', 'Partida'], ['n27', 'Proy. 2027 nominal'], ['v27', 'Proy. 2027'], ['b26', 'BASE26'], ['var26', 'Var. vs 2026'], ['dif26', 'Dif. vs 2026'],
-  ['b25', 'Dev. 2025'], ['var25', 'Var. vs 2025'], ['b23', 'BASE23'], ['var23', 'Var. vs 2023'], ['vmax', 'vs máx. hist. real'], ['sh', '% del total 2027']];
+const uTag = () => S.unit === 'nom' ? 'nominal' : 'real';
+const PCAT = [
+  {k: 'var26', g: 'Variaciones', def: true, l: () => `Var. vs ${b26Lbl()}`},
+  {k: 'var25', g: 'Variaciones', def: true, l: 'Var. vs Dev. 2025'},
+  {k: 'var23', g: 'Variaciones', def: true, l: () => `Var. vs ${b23Lbl()}`},
+  {k: 'vmax', g: 'Variaciones', def: true, l: 'Var. vs máx. histórico (real)'},
+  {k: 'dif26', g: 'Variaciones', def: false, l: 'Diferencia en $ vs 2026'},
+  {k: 'sh', g: 'Variaciones', def: false, l: '% del total 2027'},
+  {k: 'n27', g: 'Montos nominales (millones)', def: false, l: 'Proyecto 2027'},
+  {k: 'nb26', g: 'Montos nominales (millones)', def: false, l: () => b26Lbl()},
+  {k: 'nb25', g: 'Montos nominales (millones)', def: false, l: 'Devengado 2025'},
+  {k: 'nb23', g: 'Montos nominales (millones)', def: false, l: () => b23Lbl()},
+  {k: 'r27', g: 'Montos reales (millones de $ 2026)', def: false, l: () => `Proyecto 2027 (${S.esc === 'ofi' ? 'CABA 21,54%' : 'REM'})`},
+  {k: 'rb26', g: 'Montos reales (millones de $ 2026)', def: false, l: () => b26Lbl()},
+  {k: 'rb25', g: 'Montos reales (millones de $ 2026)', def: false, l: 'Devengado 2025'},
+  {k: 'rb23', g: 'Montos reales (millones de $ 2026)', def: false, l: () => b23Lbl()}];
+const HDR = {var26: () => `Var. vs 2026 (${uTag()})`, var25: () => `Var. vs 2025 (${uTag()})`, var23: () => `Var. vs 2023 (${uTag()})`, vmax: () => 'vs máx. hist. (real)',
+  dif26: () => `Dif. vs 2026 (${uTag()}, M)`, sh: () => '% del total 2027', n27: () => '2027 nominal', nb26: () => (S.b26 === 'V' ? 'Vig. 2026' : 'Sanc. 2026') + ' nominal',
+  nb25: () => 'Dev. 2025 nominal', nb23: () => (S.b23 === 'D' ? 'Dev. 2023' : 'Sanc. 2023') + ' nominal', r27: () => `2027 real (${S.esc === 'ofi' ? 'CABA' : 'REM'})`,
+  rb26: () => (S.b26 === 'V' ? 'Vig. 2026' : 'Sanc. 2026') + ' real', rb25: () => 'Dev. 2025 real', rb23: () => (S.b23 === 'D' ? 'Dev. 2023' : 'Sanc. 2023') + ' real'};
+let CP_PART;
 function renderPart() {
+  if (!CP_PART) CP_PART = colPicker('cpPart', PCAT, 'p27_cols_part', renderPart);
   const {rows, tot} = buildRows();
   const crumbs = document.getElementById('crumbs');
   crumbs.innerHTML = S.fdim && S.fkey >= 0 ? `<span class="sm">Filtro:</span><span class="chip">${DLBL[S.fdim]}: ${fullName(S.fdim, S.fkey)} <button id="clrF" title="Quitar filtro">×</button></span>` : '';
   const c = document.getElementById('clrF'); if (c) c.onclick = () => {S.fdim = ''; S.fkey = -1; S.sel = -1; buildFilter(); renderPart();};
   document.getElementById('tblTitle').textContent = `Por ${DLBL[S.by].toLowerCase()}`;
-  document.getElementById('tblSub').textContent = `En ${uLbl()}. Bases: ${b26Lbl()} · Devengado 2025 · ${b23Lbl()}.`;
+  document.getElementById('tblSub').textContent = `Variaciones ${S.unit === 'nom' ? 'nominales' : 'reales (pesos de 2026; 2027 con ' + (S.esc === 'ofi' ? 'inflación CABA 21,54%*' : 'REM 22,6%') + ')'}. Bases: ${b26Lbl()} · Devengado 2025 · ${b23Lbl()}. Sumá montos nominales o reales desde «Columnas».` + (CP_PART && !CP_PART.visible().some(c => c.k === S.sort.c) && S.sort.c !== 'nm' ? ` Ordenado por ${S.sort.c === 'n27' ? 'monto 2027' : 'una columna oculta'}.` : '');
   // KPIs
   const share = S.fdim && S.fkey >= 0 ? tot.n27 / D.total27 : null;
   document.getElementById('kpis').innerHTML = `
@@ -369,17 +426,15 @@ function renderPart() {
   if (S.by === 'fte' || S.fdim === 'fte') w.push('<b>Fuente:</b> la fuente 22 (crédito externo) es endeudamiento nuevo; en 2027 el 92,5% va al Subte (Ministerio de Movilidad e Infraestructura). Las fuentes 14 y 22 del vigente 2026 incluyen transferencias nacionales y créditos que se incorporan durante el año; por eso el proyecto inicial siempre aparece muy por debajo en esas fuentes.');
   const wb = document.getElementById('warnBox'); wb.style.display = w.length ? 'block' : 'none'; wb.innerHTML = w.join('<br>');
   // tabla
-  const hdr = COLS.map(([k, l]) => {
-    if (k === 'n27' && S.unit === 'nom') return '';
-    let t = l.replace('BASE26', b26Lbl()).replace('BASE23', b23Lbl());
-    if (k === 'v27') t = S.unit === 'nom' ? 'Proy. 2027' : `Proy. 2027 real (${S.esc === 'ofi' ? 'CABA' : 'REM'})`;
-    if (k === 'vmax' && S.unit === 'nom') return '';
+  if (!CP_PART) CP_PART = colPicker('cpPart', PCAT, 'p27_cols_part', renderPart);
+  const COLS = [['nm'], ...CP_PART.visible().map(c => [c.k])];
+  const hdr = COLS.map(([k]) => {
+    const t = k === 'nm' ? 'Partida' : HDR[k]();
     const ar = S.sort.c === k ? (S.sort.d > 0 ? ' ▲' : ' ▼') : '';
     return `<th data-k="${k}">${t}${ar}</th>`;
   }).join('');
   const cell = (r, k) => {
-    if (k === 'n27') return S.unit === 'nom' ? '' : `<td>${fmtM(r.n27)}</td>`;
-    if (k === 'vmax') return S.unit === 'nom' ? '' : `<td title="Máximo ${r.maxY || ''}">${fmtP(r.vmax)} <span class="sm">${r.maxY || ''}</span></td>`;
+    if (k === 'vmax') return `<td title="Máximo ${r.maxY || ''}">${fmtP(r.vmax)} <span class="sm">${r.maxY || ''}</span></td>`;
     if (k.startsWith('var')) return `<td>${fmtP(r[k])}</td>`;
     if (k === 'sh') return `<td>${r.sh == null ? '' : (r.sh * 100).toLocaleString('es-AR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + '%'}</td>`;
     if (k === 'dif26') return `<td class="${r.dif26 < 0 ? 'neg' : ''}">${fmtM(r.dif26)}</td>`;
@@ -514,31 +569,62 @@ function renderObras() {
     <div class="kpi"><div class="kpi-lbl">Inversión 2027 (selección)</div><div class="kpi-val">$ ${bill(t.v27)} B</div><div class="kpi-sub">${rows.length} ${{jur: 'jurisdicciones', pg: 'programas', py: 'proyectos', ob: 'obras'}[S.lvl]} · ${(t.v27 / D.ppiTot[0] * 100).toLocaleString('es-AR', {maximumFractionDigits: 1})}% del plan</div></div>
     <div class="kpi k2"><div class="kpi-lbl">2028 / 2029 (nominal)</div><div class="kpi-val">$ ${bill(t.v28)} / ${bill(t.v29)} B</div><div class="kpi-sub">el plan cae ${pTxt(vr(t.v29, t.v27))} nominal hacia 2029</div></div>
     <div class="kpi k3"><div class="kpi-lbl">vs ${b26Lbl()} (mismo código)</div><div class="kpi-val">${fmtP(vr(R(t.v27, 2027), R(tb26, 2026)))}</div><div class="kpi-sub">${S.unit === 'nom' ? 'nominal' : 'real'} · ${S.lvl === 'jur' ? 'todo el gasto en proyectos 2026' : nuevos + ' sin código equivalente en 2026'}</div></div>`;
-  document.getElementById('oSub').textContent = `${rows.length} filas · montos en millones · 2027 ${S.unit === 'nom' ? 'nominal' : 'nominal y real'} · base 2026 = ${b26Lbl()} del mismo código presupuestario`;
-  const cols = [['nm', S.lvl === 'jur' ? 'Jurisdicción' : S.lvl === 'pg' ? 'Programa' : S.lvl === 'py' ? 'Proyecto' : 'Obra'], ['ff', 'FF'], ['v27', '2027 nominal'], ['r27', S.unit === 'nom' ? '' : '2027 real'],
-    ['v28', '2028 nom.'], ['v29', '2029 nom.'], ['b26', S.b26 === 'V' ? 'Vig. 2026' : 'Sanc. 2026'], ['var26', 'Var. vs 2026'], ['d25', 'Dev. 2025'], ['var25', 'Var. vs 2025'], ['d23', 'Dev. 2023']].filter(c => c[1]);
+  document.getElementById('oSub').textContent = `${rows.length} filas · montos en millones · variaciones ${S.unit === 'nom' ? 'nominales' : 'reales'} contra el mismo código presupuestario · sumá columnas desde «Columnas»`;
+  if (!CP_OB) CP_OB = colPicker('cpObras', OCAT, 'p27_cols_obras', renderObras);
+  const cols = [['nm', S.lvl === 'jur' ? 'Jurisdicción' : S.lvl === 'pg' ? 'Programa' : S.lvl === 'py' ? 'Proyecto' : 'Obra'], ...CP_OB.visible().map(c => [c.k, OHDR[c.k]()])];
   const hdr = cols.map(([k, l]) => `<th data-k="${k}">${l}${sc.c === k ? (sc.d > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('');
   const body = rows.slice(0, 1500).map(r => `<tr><td>${oCtx(r)}${oName(r)}</td>${cols.slice(1).map(([k]) => {
     if (k === 'ff') return `<td class="sm">${[...r.ff].join(', ')}</td>`;
-    const v = oVal(r, k); if (k.startsWith('var')) return `<td>${r.h ? fmtP(v) : '<span class="sm">nuevo</span>'}</td>`;
+    const v = oVal(r, k); if (k === 'var29') return `<td>${fmtP(v)}</td>`;
+    if (k.startsWith('var')) return `<td>${r.h ? fmtP(v) : '<span class="sm">nuevo</span>'}</td>`;
+    if (k === 'tot') return `<td>${fmtM(v)}</td>`;
     return `<td>${fmtM(v)}</td>`;}).join('')}</tr>`).join('');
   const tbl = document.getElementById('oTbl');
   tbl.innerHTML = `<thead><tr>${hdr}</tr></thead><tbody>${body}</tbody>`;
   tbl.querySelectorAll('th').forEach(th => th.onclick = () => {const k = th.dataset.k; S.osort = {c: k, d: (S.osort && S.osort.c === k) ? -S.osort.d : (k === 'nm' ? 1 : -1)}; renderObras();});
   window._obras = {rows, cols};
 }
+const OCAT = [
+  {k: 'v27', g: 'Monto 2027', def: true, l: '2027 nominal'},
+  {k: 'var26', g: 'Variaciones', def: true, l: () => `Var. vs ${b26Lbl()}`},
+  {k: 'var25', g: 'Variaciones', def: true, l: 'Var. vs Dev. 2025'},
+  {k: 'var23', g: 'Variaciones', def: false, l: 'Var. vs Dev. 2023'},
+  {k: 'var29', g: 'Variaciones', def: false, l: 'Var. 2029 vs 2027 (nominal)'},
+  {k: 'ff', g: 'Detalle', def: false, l: 'Fuente de financiamiento'},
+  {k: 'v28', g: 'Montos nominales (millones)', def: false, l: '2028'},
+  {k: 'v29', g: 'Montos nominales (millones)', def: false, l: '2029'},
+  {k: 'nb26', g: 'Montos nominales (millones)', def: false, l: () => b26Lbl() + ' (mismo código)'},
+  {k: 'nd25', g: 'Montos nominales (millones)', def: false, l: 'Devengado 2025'},
+  {k: 'nd23', g: 'Montos nominales (millones)', def: false, l: 'Devengado 2023'},
+  {k: 'r27', g: 'Montos reales (millones de $ 2026)', def: false, l: () => `2027 (${S.esc === 'ofi' ? 'CABA 21,54%' : 'REM'})`},
+  {k: 'rb26', g: 'Montos reales (millones de $ 2026)', def: false, l: () => b26Lbl()},
+  {k: 'rd25', g: 'Montos reales (millones de $ 2026)', def: false, l: 'Devengado 2025'},
+  {k: 'rd23', g: 'Montos reales (millones de $ 2026)', def: false, l: 'Devengado 2023'}];
+const OHDR = {v27: () => '2027 nominal', var26: () => `Var. vs 2026 (${uTag()})`, var25: () => `Var. vs 2025 (${uTag()})`, var23: () => `Var. vs 2023 (${uTag()})`,
+  var29: () => 'Var. 2029/2027 nom.', ff: () => 'FF', v28: () => '2028 nom.', v29: () => '2029 nom.', nb26: () => (S.b26 === 'V' ? 'Vig. 2026' : 'Sanc. 2026') + ' nom.',
+  nd25: () => 'Dev. 2025 nom.', nd23: () => 'Dev. 2023 nom.', r27: () => '2027 real', rb26: () => (S.b26 === 'V' ? 'Vig. 2026' : 'Sanc. 2026') + ' real',
+  rd25: () => 'Dev. 2025 real', rd23: () => 'Dev. 2023 real'};
+let CP_OB;
 function oName(r) {return S.lvl === 'jur' ? r.jur_n : S.lvl === 'pg' ? r.pg_n : S.lvl === 'py' ? r.py_n : r.nombre;}
 function oCtx(r) {return S.lvl === 'jur' ? '' : `<span class="fin">${r.jur_n}${S.lvl !== 'pg' ? ' › ' + r.pg_n : ''}</span>`;}
 function oVal(r, k) {
   const h = r.h;
   switch (k) {
     case 'v27': case 'v28': case 'v29': return r[k];
-    case 'r27': return R(r.v27, 2027);
+    case 'r27': return realAlways(r.v27, 2027);
     case 'b26': return h && (S.b26 === 'V' ? h[0] : h[1]) ? R(S.b26 === 'V' ? h[0] : h[1], 2026) : null;
     case 'var26': return h ? vr(R(r.v27, 2027), R(S.b26 === 'V' ? h[0] : h[1], 2026)) : null;
     case 'd25': return h && h[2] ? R(h[2], 2025) : null;
     case 'var25': return h ? vr(R(r.v27, 2027), R(h[2], 2025)) : null;
     case 'd23': return h && h[3] ? R(h[3], 2023) : null;
+    case 'var23': return h && h[3] ? vr(R(r.v27, 2027), R(h[3], 2023)) : null;
+    case 'var29': return vr(r.v29, r.v27);
+    case 'nb26': return h && (S.b26 === 'V' ? h[0] : h[1]) || null;
+    case 'rb26': return h && (S.b26 === 'V' ? h[0] : h[1]) || null;
+    case 'nd25': return h && h[2] || null;
+    case 'rd25': return h && h[2] ? realAlways(h[2], 2025) : null;
+    case 'nd23': return h && h[3] || null;
+    case 'rd23': return h && h[3] ? realAlways(h[3], 2023) : null;
   }
   return null;
 }
@@ -602,10 +688,14 @@ function csvOut(aoa, fname) {
 }
 function vistaAoa() {
   const {rows, tot} = window._view;
-  const u = S.unit === 'nom' ? 'nominal' : `real $2026 (${S.esc === 'ofi' ? 'CABA 21,54%' : 'REM'})`;
-  const head = [DLBL[S.by], ...(S.by === 'fun' ? ['Finalidad'] : []), 'Proy. 2027 nominal', `Proy. 2027 ${u}`, `${b26Lbl()} ${u}`, 'Var. vs 2026', `Dev. 2025 ${u}`, 'Var. vs 2025', `${b23Lbl()} ${u}`, 'Var. vs 2023', 'Máx. hist. real (año)', 'Var. vs máx. hist. real', '% del total 2027', ...(S.by === 'jur' ? ['Nota'] : [])];
-  const line = r => [r.nm, ...(S.by === 'fun' ? [r.k >= 0 ? D.dims.fun[r.k][0] : ''] : []), r.n27, r.v27, r.b26, r.var26, r.b25, r.var25, r.b23, r.var23, r.maxY, r.vmax, r.sh, ...(S.by === 'jur' ? [r.k >= 0 ? D.dims.jur[r.k][1] || '' : ''] : [])];
-  const meta = [[`Proyecto Presupuesto 2027 CABA · por ${DLBL[S.by]}${S.fdim ? ' · filtro ' + DLBL[S.fdim] + ': ' + fullName(S.fdim, S.fkey) : ''} · ${uLbl()} · pesos (no millones)`]];
+  const u = S.unit === 'nom' ? 'nominal' : 'real';
+  const esc = S.esc === 'ofi' ? 'CABA 21,54%' : 'REM';
+  const head = [DLBL[S.by], ...(S.by === 'fun' ? ['Finalidad'] : []), `Var. vs ${b26Lbl()} (${u})`, `Var. vs Dev. 2025 (${u})`, `Var. vs ${b23Lbl()} (${u})`, 'Var. vs máx. hist. real', 'Máx. hist. real (año)', '% del total 2027',
+    'Proy. 2027 nominal', `${b26Lbl()} nominal`, 'Dev. 2025 nominal', `${b23Lbl()} nominal`,
+    `Proy. 2027 real $2026 (${esc})`, `${b26Lbl()} real $2026`, 'Dev. 2025 real $2026', `${b23Lbl()} real $2026`, ...(S.by === 'jur' ? ['Nota'] : [])];
+  const line = r => [r.nm, ...(S.by === 'fun' ? [r.k >= 0 ? D.dims.fun[r.k][0] : ''] : []), r.var26, r.var25, r.var23, r.vmax, r.maxY, r.sh,
+    r.n27, r.nb26, r.nb25, r.nb23, r.r27, r.rb26, r.rb25, r.rb23, ...(S.by === 'jur' ? [r.k >= 0 ? D.dims.jur[r.k][1] || '' : ''] : [])];
+  const meta = [[`Proyecto Presupuesto 2027 CABA · por ${DLBL[S.by]}${S.fdim ? ' · filtro ' + DLBL[S.fdim] + ': ' + fullName(S.fdim, S.fkey) : ''} · montos en pesos (no millones); reales en pesos promedio 2026 · inflación 2027 ${S.esc === 'ofi' ? 'CABA 21,54% (bloque Fuerza por Buenos Aires)' : 'REM 22,6%'}`]];
   return {meta, head, body: [...rows.map(line), line(tot)]};
 }
 document.getElementById('dlVistaX').onclick = () => {const v = vistaAoa(); wbOut([['Vista', [...v.meta, [], v.head, ...v.body]]], `Presupuesto2027_por_${S.by}${S.fdim ? '_filtro_' + S.fdim : ''}.xlsx`);};
@@ -633,8 +723,8 @@ document.getElementById('dlMat').onclick = () => {
   wbOut([['Fun_x_Jur', [[`Función × Jurisdicción · ${S.mat === 'm27' ? 'Proyecto 2027 nominal (pesos)' : S.mat === 'v26' ? 'Var. vs ' + b26Lbl() : 'Var. vs ' + b23Lbl()} · ${S.unit}`], ['Finalidad', 'Función', ...jurs.map(j => name('jur', j))],
     ...funs.map(f => [D.dims.fun[f][0], D.dims.fun[f][1], ...jurs.map(j => val(f, j).raw ?? null)])]]], `Presupuesto2027_fun_x_jur_${S.mat}.xlsx`);
 };
-const obAoa = () => {const {rows, cols} = window._obras; return [['Jurisdicción', 'Programa', 'Proyecto', 'Obra', ...cols.slice(1).map(c => c[1])],
-  ...rows.map(r => [r.jur_n, S.lvl === 'jur' ? '' : r.pg_n, ['py', 'ob'].includes(S.lvl) ? r.py_n : '', S.lvl === 'ob' ? r.nombre : '', ...cols.slice(1).map(([k]) => k === 'ff' ? [...r.ff].join(', ') : oVal(r, k))])];};
+const obAoa = () => {const {rows} = window._obras; const cols = OCAT.map(c => [c.k, OHDR[c.k]()]); return [['Jurisdicción', 'Programa', 'Proyecto', 'Obra', ...cols.map(c => c[1])],
+  ...rows.map(r => [r.jur_n, S.lvl === 'jur' ? '' : r.pg_n, ['py', 'ob'].includes(S.lvl) ? r.py_n : '', S.lvl === 'ob' ? r.nombre : '', ...cols.map(([k]) => k === 'ff' ? [...r.ff].join(', ') : oVal(r, k))])];};
 document.getElementById('dlObX').onclick = () => wbOut([['Obras', obAoa()]], `Presupuesto2027_obras_${S.lvl}.xlsx`);
 document.getElementById('dlObC').onclick = () => csvOut(obAoa(), `Presupuesto2027_obras_${S.lvl}.csv`);
 document.getElementById('dlRec').onclick = () => wbOut([['Recursos', [['Rubro', 'Vigente 2026 (M$)', 'Proyecto 2027 (M$)', 'Var. nominal', 'Var. real CABA 21,54%', 'Var. real REM'],
@@ -642,6 +732,7 @@ document.getElementById('dlRec').onclick = () => wbOut([['Recursos', [['Rubro', 
 
 // ---------- init ----------
 function renderAll() {
+  if (CP_PART) CP_PART.redraw(); if (CP_OB) CP_OB.redraw();
   const p = document.querySelector('.pane.on').id;
   if (p === 'pPart') renderPart(); else if (p === 'pMat') renderMat(); else if (p === 'pObras') renderObras(); else if (p === 'pRec') renderRec(); else renderMet();
 }
