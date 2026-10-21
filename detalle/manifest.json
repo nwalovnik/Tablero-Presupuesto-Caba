@@ -114,7 +114,7 @@
 },
 "2020_default": {
 "archivo": "detalle_2020_default.csv.gz",
-"filas": 45811
+"filas": 49493
 },
 "2020_ejec-1T": {
 "archivo": "detalle_2020_ejec-1T.csv.gz",
@@ -123,6 +123,10 @@
 "2020_ejec-2T": {
 "archivo": "detalle_2020_ejec-2T.csv.gz",
 "filas": 45811
+},
+"2020_ejec-3T": {
+"archivo": "detalle_2020_ejec-3T.csv.gz",
+"filas": 47784
 },
 "2021_default": {
 "archivo": "detalle_2021_default.csv.gz",
