@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="navegador.css">
 <style>
 :root{
   --navy:#0C2340; --sky:#6AADE4; --blue:#1B6EC2;
@@ -97,8 +98,9 @@ body{padding-top:72px}
 .section-bajada{font-size:14px;color:var(--gray600);line-height:1.55;max-width:720px;margin-bottom:18px}
 
 /* Section bands (estilo macro) */
-.sec-band{padding:42px 16px;margin:0 -16px}
-@media(min-width:700px){.sec-band{padding:56px 24px;margin:0 -24px}}
+/* Las bandas están fuera de .tb: sin margen negativo (si no, en celular el texto toca el borde) */
+.sec-band{padding:42px 16px;margin:0}
+@media(min-width:700px){.sec-band{padding:56px 24px}}
 .sec-band > .sec-inner{max-width:1232px;margin:0 auto}
 .sec-datos{background:#fff}
 .sec-explorador{background:linear-gradient(180deg,#F3F8FF 0%,#EAF2FE 100%);border-top:1px solid #D8E5F3;border-bottom:1px solid #D8E5F3}
@@ -111,7 +113,8 @@ body{padding-top:72px}
 
 /* Hero con 3 secciones */
 .hero-secs{display:grid;grid-template-columns:1fr;gap:10px;margin-top:18px;margin-bottom:8px}
-@media(min-width:780px){.hero-secs{grid-template-columns:repeat(3,1fr);gap:12px}}
+@media(min-width:780px){.hero-secs{grid-template-columns:repeat(2,1fr);gap:12px}}
+@media(min-width:1100px){.hero-secs{grid-template-columns:repeat(4,1fr)}}
 .hero-sec{background:#fff;border:1px solid var(--gray200);border-radius:10px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start;text-decoration:none;color:inherit;transition:.2s;cursor:pointer}
 .hero-sec:hover{border-color:var(--blue);transform:translateY(-2px);box-shadow:0 6px 18px rgba(12,35,64,.08)}
 .hero-sec .num{font-family:var(--disp);font-weight:900;font-size:22px;color:var(--blue);line-height:1;flex-shrink:0;width:28px}
@@ -171,6 +174,7 @@ body{padding-top:72px}
 .cm-side-item .per{font-size:11px;color:var(--gray500)}
 .cm-side-hint{font-size:11px;color:var(--gray500);margin-top:14px;border-top:1px solid #E2E8F2;padding-top:10px}
 .grid{display:grid;grid-template-columns:1fr;gap:14px}
+.grid>*{min-width:0}
 @media(min-width:780px){.grid.g2{grid-template-columns:1fr 1fr}.grid.g3{grid-template-columns:2fr 1fr}}
 .card{background:#fff;border:1px solid var(--gray200);border-radius:12px;padding:16px;display:flex;flex-direction:column}
 @media(min-width:700px){.card{padding:20px}}
@@ -310,7 +314,8 @@ tr.trow.sel:hover{background:rgba(192,106,0,.16)}
   <div class="hero-secs">
     <a href="#sec-datos" class="hero-sec"><div class="num">1</div><div><div class="lbl">Datos</div><div class="desc">Gráficos preset por año, jurisdicción, finalidad e inciso.</div></div></a>
     <a href="#sec-explorador" class="hero-sec feature"><div class="num">2</div><div><div class="lbl">Explorador</div><div class="desc">Filtrá por ministerio y programa para ver evolución 2013–26.</div></div></a>
-    <a href="#sec-calendario" class="hero-sec"><div class="num">3</div><div><div class="lbl">Calendario</div><div class="desc">Próximas publicaciones oficiales del presupuesto CABA.</div></div></a>
+    <a href="#sec-navegador" class="hero-sec feature"><div class="num">3</div><div><div class="lbl">Navegador</div><div class="desc">Series 2013–26 y proyecto 2027 por función o jurisdicción; clic para abrir programas, proyectos y obras.</div></div></a>
+    <a href="#sec-calendario" class="hero-sec"><div class="num">4</div><div><div class="lbl">Calendario</div><div class="desc">Próximas publicaciones oficiales del presupuesto CABA.</div></div></a>
   </div>
 
   <!-- Acceso al explorador del Proyecto de Presupuesto 2027 (página aparte) -->
@@ -342,7 +347,7 @@ tr.trow.sel:hover{background:rgba(192,106,0,.16)}
       </div>
       <div class="tog-grp" id="togGrp">
         <button class="tog-btn active" id="btnNom" type="button">Nominal</button>
-        <button class="tog-btn r" id="btnReal" type="button">Real · IPCBA</button>
+        <button class="tog-btn r" id="btnReal" type="button">Real · $ 2026</button>
       </div>
     </div>
   </div>
@@ -380,7 +385,7 @@ tr.trow.sel:hover{background:rgba(192,106,0,.16)}
     <div class="card">
       <div class="card-hd">
         <div><h3>Evolución 2013-2026</h3><div class="card-sub" id="subEvol">Devengado (2013-25) + Sancionado 2026 · nominal vs. real</div></div>
-        <span class="card-tag">IPCBA base 2019</span>
+        <span class="card-tag">Real: pesos de 2026</span>
       </div>
       <div class="ch"><canvas id="chEvol"></canvas></div>
     </div>
@@ -514,9 +519,31 @@ tr.trow.sel:hover{background:rgba(192,106,0,.16)}
     </div><!-- /.sec-inner -->
   </section><!-- /sec-explorador -->
 
+  <section class="sec-band sec-navegador" id="sec-navegador">
+    <div class="sec-inner">
+      <div class="section-lbl">Sección 3 · Navegador 2013-2027 ★</div>
+      <h2 class="section-h">Del total a la obra, año por año</h2>
+      <p class="section-bajada">Elegí ver el presupuesto <b>por función</b> (salud, educación, transporte…) o <b>por jurisdicción</b>. Con un clic abrís los <b>programas</b>; con otro, sus <b>proyectos, obras y actividades</b>. Cada nivel trae su serie 2013-2026 más el <b>proyecto 2027</b> (barra rayada), la composición por inciso, fuente, unidad ejecutora y comuna, y las mayores subas y bajas. Los montos arrancan en pesos de 2026 para que los años se puedan comparar.</p>
+      <div id="nvRoot"></div>
+      <details class="nv-note">
+        <summary>Cómo se arma el navegador</summary>
+        <ul>
+          <li><b>Fuente.</b> Ejecución presupuestaria de BA Data línea por línea: cierre anual (4.º trimestre) 2013-2025 y, para 2026, el último trimestre publicado (sancionado, vigente y devengado acumulado). Sin aplicaciones financieras, igual que el resto del tablero.</li>
+          <li><b>Monto.</b> «Devengado» usa el cierre de cada año y, para 2026, el sancionado (el año no terminó). «Vigente» usa para 2026 el crédito vigente al último trimestre. La barra de 2026 va más clara en los gráficos.</li>
+          <li><b>Real.</b> Pesos de 2026 con el IPC promedio anual del tablero (2026 es una estimación). Las variaciones se muestran siempre en términos reales.</li>
+          <li><b>Proyecto 2027.</b> Sale de los cuadernos jurisdiccionales que el GCBA envió con el proyecto (sin aplicaciones financieras) y se pasa a pesos de 2026 con la inflación promedio de 21,54%. Cada programa se empalma con su par de 2026 por código. Los cuadernos abren hasta programa y subprograma: en 2027 no hay proyectos, obras, actividades ni comunas. Como un programa puede gastar en varias funciones, el monto 2027 se reparte según su composición 2026 y se ajusta para que cada jurisdicción sume lo que dice la planilla 8 (función × jurisdicción) del proyecto.</li>
+          <li><b>Jurisdicciones.</b> Se siguen por código: el nombre cambia con cada gestión (por ejemplo, Desarrollo Social → Hábitat y Desarrollo Humano → Desarrollo Humano y Hábitat) y la serie sigue. El código 65 se separa en dos porque en 2016 pasó de Desarrollo Económico a Modernización.</li>
+          <li><b>Programas.</b> Se siguen por nombre dentro de la jurisdicción. Si un programa conserva el código y cambia poco el nombre (abreviaturas, errores de tipeo), se une con el anterior y se muestra el historial de nombres. Cuando un programa pasa de un ministerio a otro, la serie se corta y el detalle indica de dónde viene o adónde pasa, con un enlace.</li>
+          <li><b>Proyectos y obras.</b> Los proyectos de inversión (código de proyecto distinto de 0) se abren en sus obras; el resto son actividades. Se siguen por nombre dentro del programa, así que una obra rebautizada aparece como nueva.</li>
+          <li><b>Función.</b> Cada línea del presupuesto trae su función, así que el corte por función es exacto aunque un programa tenga actividades en más de una función.</li>
+        </ul>
+      </details>
+    </div>
+  </section><!-- /sec-navegador -->
+
   <section class="sec-band sec-calendario" id="sec-calendario">
     <div class="sec-inner">
-      <div class="section-lbl">Sección 3 · Calendario</div>
+      <div class="section-lbl">Sección 4 · Calendario</div>
       <h2 class="section-h">Próximas publicaciones</h2>
       <p class="section-bajada">Cronograma oficial del presupuesto CABA: ejecuciones trimestrales, cuenta de inversión y ley anual. Hacé click en un día para ver el detalle.</p>
 
@@ -558,7 +585,7 @@ tr.trow.sel:hover{background:rgba(192,106,0,.16)}
   <div class="note">
     <b>Metodología.</b> 2013-2019: datos del ZIP histórico de BA Data (cierre anual, 4° trimestre). 2020-2025: cierre anual (4° trimestre), columna devengado en valores corrientes. 2026: proyecto sancionado por Ley 6929, columna sanción. Los totales consolidan administración central, organismos descentralizados y entidades.<br>
     <b>Exclusión de Aplicaciones Financieras.</b> Se excluyen filas con Clasificación Económica que comienza con <em>23</em> (amortización de deuda e inversión financiera), siguiendo la convención del Informe de Ejecución Presupuestaria del GCBA: <em>"No incluye Gastos Figurativos ni Aplicaciones Financieras"</em>. Esto reconcilia el devengado del CSV con el total publicado en el PDF oficial de cierre anual.<br>
-    <b>Deflactor real.</b> Los valores reales se calculan como <em>Nominal<sub>t</sub> / IPC_prom<sub>t</sub> × 100</em>, donde IPC_prom<sub>t</sub> es el promedio anual del índice de precios de CABA (base 2019 = 100): IPCBA/IDECBA para 2013-2021, IPC Nacional INDEC para 2022-2025 (el IPCBA fue discontinuado en feb-2022), estimación para 2026. La variación real interanual se calcula como <em>(Nom<sub>t</sub>/IPC_prom<sub>t</sub>) / (Nom<sub>t−1</sub>/IPC_prom<sub>t−1</sub>) − 1</em>. Los programas con diferencias tipográficas menores dentro de una misma jurisdicción se consolidan automáticamente.
+    <b>Deflactor real.</b> Los valores reales se expresan en <b>pesos de 2026</b>: <em>Nominal<sub>t</sub> × IPC_prom<sub>2026</sub> / IPC_prom<sub>t</sub></em>, donde IPC_prom<sub>t</sub> es el promedio anual del índice de precios de CABA: IPCBA/IDECBA para 2013-2021, IPC Nacional INDEC para 2022-2025 (el IPCBA fue discontinuado en feb-2022), estimación para 2026. La variación real interanual se calcula como <em>(Nom<sub>t</sub>/IPC_prom<sub>t</sub>) / (Nom<sub>t−1</sub>/IPC_prom<sub>t−1</sub>) − 1</em>. Los programas con diferencias tipográficas menores dentro de una misma jurisdicción se consolidan automáticamente.
     <details class="ipc-audit" id="ipcAudit">
       <summary>▶ Ver tabla de deflactores IPC_prom por año (auditoría)</summary>
       <div class="ia-tbl"><table id="ipcAuditTbl"></table></div>
@@ -628,7 +655,8 @@ const fmtMoney = v=>{
 };
 const fmtPct = v=>(v>=0?'+':'')+v.toFixed(1).replace('.',',')+'%';
 const amountOf = y => y===SANC_YEAR ? DATA.data[y].totals.sancion : DATA.data[y].totals.devengado;
-const real = (v,y)=> v * (IPC[2019]/IPC[y]);
+const YB = DATA.year_sanc;  // año de los pesos constantes (el del presupuesto en curso)
+const real = (v,y)=> v * (IPC[YB]/IPC[y]);
 const pctOf = (part,whole)=> whole? part/whole*100 : 0;
 
 let currentYear = YEARS[YEARS.length-2] || YEARS[YEARS.length-1]; // default 2025
@@ -636,14 +664,14 @@ let charts = {};
 let showReal = false;
 let filtroApply = null; // expuesto por renderFiltro para ser llamado desde el toggle
 
-// IPC_prom[t] = promedio anual del IPCBA, base 2019=100 (IDECBA)
-// Deflactor: Nominal_t / IPC_prom_t * 100 → pesos constantes 2019
+// IPC_prom[t] = promedio anual del IPCBA (índice base 2019=100, IDECBA); los reales se expresan en pesos de YB
+// Deflactor: Nominal_t × IPC_prom_YB / IPC_prom_t → pesos constantes del año YB (2026)
 // Var. real: (Nom_t/IPC_prom_t) / (Nom_{t-1}/IPC_prom_{t-1}) − 1
 const IPCBA_PROM = DATA.ipc_indice; // mismos valores, alias semántico
 
-const deflact = (v, y) => v * (IPCBA_PROM[2019] / IPCBA_PROM[y]);
+const deflact = (v, y) => v * (IPCBA_PROM[YB] / IPCBA_PROM[y]);
 const dispAmt  = (v, y) => showReal ? deflact(v, y) : v;
-const modeLabel = () => showReal ? 'Pesos 2019 (real)' : '$ nominales';
+const modeLabel = () => showReal ? 'Pesos '+YB+' (real)' : '$ nominales';
 const modeSuffix = () => showReal ? ' · real' : '';
 
 // ── Normalización y deduplicación de programas ──────────────────────────────
@@ -857,7 +885,7 @@ function renderTabs(){
     yState.textContent = isSanc?'· Sancionado':'· Ejecutado';
   }
   if(yMode){
-    yMode.textContent = showReal ? 'REAL · 2019' : 'NOMINAL';
+    yMode.textContent = showReal ? 'REAL · '+YB : 'NOMINAL';
     yMode.className = 'yr-mode' + (showReal?' real':'');
   }
 }
@@ -894,7 +922,7 @@ function renderKpis(){
     ? `Devengado al ${trimNum}° TRIM ${currentYear}`
     : (isSanc?'Sancionado '+currentYear:'Devengado '+currentYear);
   const subPrincipal = (currentJur ? currentJur + ' · ' : '') + (showReal
-    ? 'Pesos constantes 2019'
+    ? 'Pesos constantes '+YB
     : (isSanc?'Proyecto Ley 6929':(isExecParcial?'Acumulado al trimestre · CSV BA Data':'Pesos corrientes')));
 
   // KPI secundario: con jurisdicción seleccionada muestra su participación en el
@@ -1003,10 +1031,10 @@ function renderEvol(){
     ? `Devengado acumulado al ${TRIM_LBL[q]} trimestre de cada año · comparación interanual homogénea`
     : 'Devengado (2013-25) + Sancionado 2026 · nominal vs. real');
   const datasets = showReal
-    ? [{label:'Real (pesos 2019)',data:rl,borderColor:NAVY,backgroundColor:'rgba(12,35,64,.1)',fill:true,tension:.25,pointRadius:4,pointBackgroundColor:NAVY,segment:{borderDash:dashSeg}}]
+    ? [{label:'Real (pesos '+YB+')',data:rl,borderColor:NAVY,backgroundColor:'rgba(12,35,64,.1)',fill:true,tension:.25,pointRadius:4,pointBackgroundColor:NAVY,segment:{borderDash:dashSeg}}]
     : [
         {label:'Nominal',data:nom,borderColor:SKY,backgroundColor:'rgba(106,173,228,.15)',fill:true,tension:.25,pointRadius:4,pointBackgroundColor:SKY,segment:{borderDash:dashSeg}},
-        {label:'Real (base 2019)',data:rl,borderColor:NAVY,backgroundColor:'rgba(12,35,64,.06)',fill:true,tension:.25,pointRadius:4,pointBackgroundColor:NAVY,segment:{borderDash:dashSeg}}
+        {label:'Real (pesos '+YB+')',data:rl,borderColor:NAVY,backgroundColor:'rgba(12,35,64,.06)',fill:true,tension:.25,pointRadius:4,pointBackgroundColor:NAVY,segment:{borderDash:dashSeg}}
       ];
   makeChart('chEvol',{
     type:'line',
@@ -1014,7 +1042,7 @@ function renderEvol(){
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:'bottom'},
         tooltip:{callbacks:{label:c=>c.dataset.label+': $'+fmtMoney(c.parsed.y)+((c.dataIndex===lastIdx && !isTrimMode)?' (sancionado)':'')}}},
-      scales:{y:{ticks:{callback:v=>'$'+fmtMoney(v)},title:{display:showReal,text:'Pesos constantes 2019',font:{size:10}}}}
+      scales:{y:{ticks:{callback:v=>'$'+fmtMoney(v)},title:{display:showReal,text:'Pesos constantes '+YB,font:{size:10}}}}
     }
   });
 }
@@ -1060,7 +1088,7 @@ function renderJur(){
     data:{labels:dispEnt.map(x=>x[0]),datasets:[{data:dispEnt.map(x=>x[1]),backgroundColor:colors,borderRadius:4}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
       onClick:(e,els)=>{ if(els.length){ const name=ent[els[0].index][0]; setJur(name===currentJur?'':name); } },
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'$'+fmtMoney(c.parsed.x)+(showReal?' (pesos 2019)':'')+(ent[c.dataIndex][0]===currentJur?' · seleccionada':' · click para filtrar')}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'$'+fmtMoney(c.parsed.x)+(showReal?' (pesos '+YB+')':'')+(ent[c.dataIndex][0]===currentJur?' · seleccionada':' · click para filtrar')}}},
       scales:{x:{ticks:{callback:v=>'$'+fmtMoney(v)}},y:{ticks:{font:{size:11},autoSkip:false}}}
     }
   });
@@ -1076,7 +1104,7 @@ function renderInc(){
     data:{labels:dispEnt.map(x=>x[0]),datasets:[{data:dispEnt.map(x=>x[1]),backgroundColor:PAL,borderWidth:2,borderColor:'#fff'}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'55%',
       plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}},
-        tooltip:{callbacks:{label:c=>c.label+': $'+fmtMoney(c.parsed)+(showReal?' (pesos 2019)':'')}}}}
+        tooltip:{callbacks:{label:c=>c.label+': $'+fmtMoney(c.parsed)+(showReal?' (pesos '+YB+')':'')}}}}
   });
 }
 
@@ -1090,7 +1118,7 @@ function renderProg(){
     type:'bar',
     data:{labels:ent.map(x=>x[0]),datasets:[{data:ent.map(x=>x[1]),backgroundColor:NAVY,borderRadius:4}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'$'+fmtMoney(c.parsed.x)+(showReal?' (pesos 2019)':'')}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'$'+fmtMoney(c.parsed.x)+(showReal?' (pesos '+YB+')':'')}}},
       scales:{x:{ticks:{callback:v=>'$'+fmtMoney(v)}},y:{ticks:{font:{size:10.5},autoSkip:false}}}
     }
   });
@@ -1176,12 +1204,12 @@ function renderSparcEvolution(concept){
       plugins: {
         legend: {display: false},
         tooltip: {callbacks: {
-          label: c => '$' + fmtMoney(c.parsed.y) + (showReal?' (pesos 2019)':''),
+          label: c => '$' + fmtMoney(c.parsed.y) + (showReal?' (pesos '+YB+')':''),
           afterLabel: c => (c.dataIndex===lastIdx && yearsList[lastIdx]===SANC_YEAR && q===null) ? '⚠ 2026 ejecutado parcial (1T)' : ''
         }}
       },
       scales: {
-        y: {ticks: {callback: v => '$' + fmtMoney(v)}, title:{display:showReal,text:'Pesos constantes 2019',font:{size:10}}},
+        y: {ticks: {callback: v => '$' + fmtMoney(v)}, title:{display:showReal,text:'Pesos constantes '+YB,font:{size:10}}},
         x: {grid: {display: false}}
       }
     }
@@ -1303,7 +1331,7 @@ function renderSparc(){
     data:{labels,datasets:[{data:values,backgroundColor:colors,borderRadius:4}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{callbacks:{
-        label:c=>'$'+fmtMoney(c.parsed.x)+(showReal?' (pesos 2019)':''),
+        label:c=>'$'+fmtMoney(c.parsed.x)+(showReal?' (pesos '+YB+')':''),
         afterLabel:c=>{
           const inc = sparcInc[c.label];
           return inc ? 'Inciso: '+inc : '';
@@ -1325,7 +1353,7 @@ function renderTblJur(){
   const thead = document.querySelector('#tblJur thead tr');
   if(thead){
     thead.innerHTML = showReal
-      ? `<th>Jurisdicción</th><th style="text-align:right">Monto real<br><small>pesos 2019</small></th><th style="text-align:right">% total</th><th style="text-align:right">Var. real<br><small>vs año ant.</small></th><th style="text-align:right">Ejec.%</th>`
+      ? `<th>Jurisdicción</th><th style="text-align:right">Monto real<br><small>pesos ${YB}</small></th><th style="text-align:right">% total</th><th style="text-align:right">Var. real<br><small>vs año ant.</small></th><th style="text-align:right">Ejec.%</th>`
       : `<th>Jurisdicción</th><th style="text-align:right">Monto</th><th style="text-align:right">%</th><th style="text-align:right">Vigente</th><th style="text-align:right">Ejec.%</th>`;
   }
   const prevYear = YEARS[YEARS.indexOf(currentYear)-1];
@@ -1406,15 +1434,15 @@ function renderFiltro(){
       data:{labels:YEARS.map(String),datasets:[{label:'Monto',data:dispVals,
         backgroundColor:YEARS.map(y=>y===SANC_YEAR?'#C06A00':BLUE),borderRadius:4}]},
       options:{responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'$'+fmtMoney(c.parsed.y)+(YEARS[c.dataIndex]===SANC_YEAR?' (sancionado)':'')+(showReal?' (pesos 2019)':'')}}},
-        scales:{y:{ticks:{callback:v=>'$'+fmtMoney(v)},title:{display:showReal,text:'Pesos constantes 2019',font:{size:10}}}}}
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'$'+fmtMoney(c.parsed.y)+(YEARS[c.dataIndex]===SANC_YEAR?' (sancionado)':'')+(showReal?' (pesos '+YB+')':'')}}},
+        scales:{y:{ticks:{callback:v=>'$'+fmtMoney(v)},title:{display:showReal,text:'Pesos constantes '+YB,font:{size:10}}}}}
     });
 
     // tabla: mostrar variación real interanual cuando showReal=true
     const tblHead = document.querySelector('#tblFilt thead tr');
     if(tblHead){
       tblHead.innerHTML = showReal
-        ? '<th>Año</th><th>Tipo</th><th style="text-align:right">Monto real<br><small>pesos 2019</small></th><th style="text-align:right">% del total</th><th style="text-align:right">Var. real<br><small>vs año ant.</small></th>'
+        ? '<th>Año</th><th>Tipo</th><th style="text-align:right">Monto real<br><small>pesos ${YB}</small></th><th style="text-align:right">% del total</th><th style="text-align:right">Var. real<br><small>vs año ant.</small></th>'
         : '<th>Año</th><th>Tipo</th><th style="text-align:right">Monto</th><th style="text-align:right">% del total</th>';
     }
     const tbody = document.querySelector('#tblFilt tbody');
@@ -1539,9 +1567,9 @@ function _csvCtx(){
   const q = currentTrimNum();
   const per = q!==null ? `ejec-${q}T`
             : (currentYear===SANC_YEAR ? 'sancionado' : 'ejecutado-cierre');
-  const modo = showReal ? 'real-pesos2019' : 'nominal';
+  const modo = showReal ? 'real-pesos'+YB : 'nominal';
   const jur = currentJur ? '_' + _slug(currentJur) : '';
-  return {per, modo, jur, colVal: showReal ? 'Monto (pesos constantes 2019)' : 'Monto (pesos corrientes)'};
+  return {per, modo, jur, colVal: showReal ? 'Monto (pesos constantes '+YB+')' : 'Monto (pesos corrientes)'};
 }
 function _slug(s){
   return s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase()
@@ -1617,7 +1645,7 @@ const _periodoTxt = () => {
   return currentYear===SANC_YEAR ? `Sancionado ${currentYear}` : `Ejecutado ${currentYear} (cierre)`;
 };
 const _dispVal = v => showReal ? deflact(v, currentYear) : v;
-const _modoTxt = () => showReal ? 'Pesos constantes 2019 (real, IPCBA)' : 'Pesos corrientes (nominal)';
+const _modoTxt = () => showReal ? 'Pesos constantes '+YB+' (real, IPCBA)' : 'Pesos corrientes (nominal)';
 
 // —— Resumen: workbook con todas las aperturas del tablero para el filtro activo ——
 function exportResumenExcel(){
@@ -1625,7 +1653,7 @@ function exportResumenExcel(){
   const base = currentData();          // período completo (para ranking de jurisdicciones)
   const d = scopedData();              // acotado a la jurisdicción si hay filtro
   const wb = XLSX.utils.book_new();
-  const colMonto = showReal ? 'Monto (pesos 2019)' : 'Monto (pesos corrientes)';
+  const colMonto = showReal ? 'Monto (pesos '+YB+')' : 'Monto (pesos corrientes)';
   // Hoja Resumen
   const meta = [
     ['Tablero Presupuesto CABA — Resumen'],
@@ -1861,5 +1889,6 @@ setupDownloads();
   });
 })();
 </script>
+<script src="navegador.js"></script>
 </body>
 </html>

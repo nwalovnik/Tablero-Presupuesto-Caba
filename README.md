@@ -8,7 +8,8 @@ Tablero interactivo del presupuesto de la Ciudad de Buenos Aires, 2013–2026.
 
 - **Sección 1 · Datos**: KPIs, evolución 2013-2026, jurisdicciones, finalidad, inciso y top programas.
 - **Sección 2 · Explorador**: filtro interactivo por ministerio y programa, con evolución y variación real interanual.
-- **Sección 3 · Calendario**: próximas publicaciones oficiales del presupuesto CABA en formato mensual.
+- **Sección 3 · Navegador 2013-2027**: árbol función / jurisdicción → programa → proyecto y obra / actividad, con la serie anual de cada nivel (devengado, sancionado o vigente; nominal o real en pesos de 2026), la composición por inciso, partida, fuente, unidad ejecutora, comuna y subprograma, buscador y descarga a Excel. Datos en `navegador_data.json`. El 2027 es el **proyecto** (`data/proyecto_2027.json`, de los cuadernos jurisdiccionales): abre hasta programa y subprograma, se deflacta con 21,54% y su reparto por función usa la estructura 2026 de cada programa ajustada a la planilla 8.
+- **Sección 4 · Calendario**: próximas publicaciones oficiales del presupuesto CABA en formato mensual.
 
 Toggle Nominal / Real (deflactado por IPCBA empalmado base 2019=100).
 
@@ -37,7 +38,7 @@ GitHub Actions corre `.github/workflows/actualizar.yml` todos los días a las 11
 
 1. `descargar_datos.py` — baja los CSVs/XLSX/ZIP desde BA Data e IDECBA.
 2. `build_ipc.py` — recalcula `IPC_PROMEDIO_ANUAL` desde el IPCBA mensual (promedio anual simple; años parciales con método de períodos comparables).
-3. `data/build_budget_data.py` — agrega registros por jurisdicción / finalidad / función / programa / inciso → `budget_data.json`.
+3. `data/build_budget_data.py` — agrega registros por jurisdicción / finalidad / función / programa / inciso → `budget_data.json`. En CI también corre `data/build_detalle.py` (detalle descargable) y `data/build_navegador.py` (→ `navegador_data.json`).
 4. `inyectar_html.py` — inyecta el JSON dentro del HTML autocontenido.
 5. `build_calendario.py` — regenera el calendario de próximas publicaciones.
 6. Commit + push.
@@ -51,9 +52,11 @@ pip install requests openpyxl
 python descargar_datos.py
 python build_ipc.py
 python data/build_budget_data.py
+python data/build_navegador.py
 python inyectar_html.py
 python build_calendario.py
-# abrir tablero-presupuesto.html en el browser
+# servir la carpeta (el navegador lee navegador_data.json con fetch):
+python -m http.server 3344   # y abrir http://localhost:3344/tablero-presupuesto.html
 ```
 
 ## Stack

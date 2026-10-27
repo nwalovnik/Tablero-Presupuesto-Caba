@@ -600,6 +600,10 @@ def main():
         print('CI: generando detalle línea por línea...', flush=True)
         subprocess.run([sys.executable, os.path.join(DATA_DIR, 'build_detalle.py')], check=False)
         subprocess.run(['git', 'add', 'detalle', 'data/build_detalle.py'], cwd=repo, check=False)
+        # Datos del Navegador 2013-2026 (sección 3 del tablero)
+        print('CI: generando datos del navegador...', flush=True)
+        subprocess.run([sys.executable, os.path.join(DATA_DIR, 'build_navegador.py')], check=False)
+        subprocess.run(['git', 'add', 'navegador_data.json'], cwd=repo, check=False)
 
 if __name__ == '__main__':
     main()
