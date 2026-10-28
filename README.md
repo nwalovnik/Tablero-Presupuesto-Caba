@@ -29,6 +29,7 @@ Siguiendo la convención del **Informe de Ejecución Presupuestaria del GCBA** (
 - Se excluyen filas con **Clasificación Económica que comienza con `23`** (Aplicaciones Financieras: amortización de deuda e inversión financiera).
 - Se excluyen filas con jurisdicción vacía (subtotales/totales pre-calculados de los CSVs).
 - Programas con diferencias tipográficas menores (acentos, puntos, espacios) dentro de la misma jurisdicción se consolidan automáticamente.
+- Navegador: un programa que pasa de una jurisdicción a otra con el mismo nombre (o uno de sus nombres anteriores; "de la Caba" = "de la Ciudad de Buenos Aires") queda unido en una sola serie, aunque el año del traspaso figure en las dos (`build_navegador.py` marca la cadena con viene de / pasa a; `navegador.js` la une).
 
 Esto reconcilia el devengado del CSV con el total publicado en el PDF oficial de cierre anual.
 

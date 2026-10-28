@@ -145,8 +145,13 @@ class Label:
 STOP = SMALL | {'programa', 'programas', 'prog', 'progr'}
 
 
+def canon(n):
+    """Nombre normalizado con equivalencias de escritura ("de la Caba" = "de la Ciudad de Buenos Aires")."""
+    return re.sub(r'\b(ciudad (autonoma )?de buenos aires|c a b a|caba|ciudad autonoma)\b', 'caba', n)
+
+
 def _tokens(n):
-    return [t for t in n.split() if t not in STOP and not t.isdigit()]
+    return [t for t in canon(n).split() if t not in STOP and not t.isdigit()]
 
 
 def similar(a, b):
@@ -563,7 +568,8 @@ def main():
 
     # Programa → [jurisdicción, rótulo, historial de nombres, viene de, pasa a].
     # "Viene de / pasa a": mismo nombre en otra jurisdicción que termina el año
-    # anterior a que éste empiece (traspasos entre ministerios).
+    # anterior a que éste empiece, o ese mismo año (traspasos entre ministerios).
+    # El navegador une la cadena en una sola serie.
     progs = [None] * len(prog_idx)
     for pk, i in prog_idx.items():
         hist = []
@@ -575,18 +581,33 @@ def main():
                 hist.append([lab, y, y])
         progs[i] = [jur_idx[pk[0]], prog_lab.get(pk), hist if len(hist) > 1 else [], -1, -1]
     span = {i: (min(py), max(py)) for i, py in prog_years.items()}
-    by_name = defaultdict(list)
+    # Se compara con todos los nombres que tuvo cada programa, y el traspaso puede
+    # superponerse un año (el año del cambio el programa figura en los dos ministerios).
+    def name_key(raw):
+        nm = re.sub(r'^\d+ ', '', canon(norm(raw))).split()  # "Comuna 4" no es "Comuna 10"
+        return ' '.join(t for t in nm if t not in SMALL)
+    by_name = defaultdict(set)
     for pk, i in prog_idx.items():
-        if not generic(pk[1]) and pk[0] not in ('98', '99'):  # OCT repite nombres de programas
-            by_name[re.sub(r'\d+', '', pk[1]).strip()].append(i)
-    moves = 0
+        if pk[0] in ('98', '99'):  # OCT repite nombres de programas
+            continue
+        for raw in set(prog_years[i].values()) | {pk[1]}:
+            nm = name_key(raw)
+            if nm and not generic(norm(raw)):
+                by_name[nm].add(i)
+    cands = set()
     for name, idxs in by_name.items():
         for a in idxs:
             for b in idxs:
-                if progs[a][0] != progs[b][0] and span[a][1] + 1 == span[b][0]:
-                    if progs[a][4] == -1 and progs[b][3] == -1:
-                        progs[a][4], progs[b][3] = b, a
-                        moves += 1
+                if (progs[a][0] != progs[b][0] and span[a][0] < span[b][0] and span[a][1] < span[b][1]
+                        and span[b][0] - 1 <= span[a][1] <= span[b][0]):
+                    same = name_key(prog_years[a][span[a][1]]) == name_key(prog_years[b][span[b][0]])
+                    cands.add((span[b][0] - span[a][1], same, a, b))
+    moves = 0
+    # primero los traspasos sin superposición y con el mismo nombre en el año del cambio
+    for _, _, a, b in sorted(cands, key=lambda c: (-c[0], not c[1], c[2], c[3])):
+        if progs[a][4] == -1 and progs[b][3] == -1:
+            progs[a][4], progs[b][3] = b, a
+            moves += 1
     print(f'  {moves} traspasos de programas entre jurisdicciones detectados', flush=True)
     leaves = [None] * len(leaf_idx)
     for lk, i in leaf_idx.items():

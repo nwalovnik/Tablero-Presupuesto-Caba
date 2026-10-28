@@ -15,7 +15,7 @@
   const S = {mode: 'fun', path: [], metric: 'd', yRef: 2025, yCmp: 2015, q: '', view: 'stack', tab: 'inc', sort: {c: 'ref', d: -1}, real: true};
 
   let N, Y, NY, YL, YP, YE, iC, iP, IPC, R;  // datos; YL = año en curso y de los pesos constantes, YP = año del proyecto
-  let leafProj, progJur;             // derivados
+  let leafProj, progJur, LIN, CL, PY, PK;  // derivados
   let chMain, chTop, CP;
 
   const isReal = () => S.real;
@@ -59,13 +59,36 @@
     N.leaf.forEach(l => { if (l[1] === 'Z') l[2] = 'Sin apertura por actividad u obra'; });
     IPC = {}; Object.keys(N.ipc).forEach(k => IPC[+k] = N.ipc[k]);
     progJur = N.prog.map(p => p[0]);
-    leafProj = N.leaf.map(l => l[1] === 'O' ? l[0] + '|' + l[3] : null);
+    // Programas traspasados entre jurisdicciones (N.prog[p][3] viene de / [4] pasa a):
+    // una sola serie, identificada por el primer programa de la cadena (LIN).
+    LIN = N.prog.map((p, i) => { while (N.prog[i][3] >= 0) i = N.prog[i][3]; return i; });
+    // Proyectos con el mismo nombre en los tramos de una cadena: un solo proyecto
+    PK = new Map();
+    leafProj = N.leaf.map(l => {
+      if (l[1] !== 'O') return null;
+      const k = LIN[l[0]] + '|' + norm(l[3]);
+      if (!PK.has(k)) PK.set(k, LIN[l[0]] + '|' + l[3]);
+      return PK.get(k);
+    });
+    // Actividades y obras: también se unen entre tramos (una por tramo y nombre)
+    CL = N.leaf.map((l, li) => li);
+    const grp = new Map();
+    N.leaf.forEach((l, li) => {
+      if (LIN[l[0]] === l[0] && N.prog[l[0]][4] < 0) return;
+      const k = LIN[l[0]] + l[1] + '|' + norm(l[2]) + '|' + norm(l[3]);
+      if (!grp.has(k)) grp.set(k, []);
+      grp.get(k).push(li);
+    });
+    grp.forEach(ls => { if (ls.length > 1 && new Set(ls.map(li => N.leaf[li][0])).size === ls.length) ls.forEach(li => CL[li] = ls[0]); });
     const n = N.t.length;
-    R = {y: new Uint8Array(n), f: new Uint8Array(n), l: new Uint32Array(n), p: new Uint32Array(n), j: new Uint8Array(n),
+    R = {y: new Uint8Array(n), f: new Uint8Array(n), l: new Uint32Array(n), c: new Uint32Array(n), p: new Uint32Array(n), g: new Uint32Array(n), j: new Uint8Array(n),
          s: new Float64Array(n), v: new Float64Array(n), d: new Float64Array(n)};
+    PY = N.prog.map(() => [Infinity, -Infinity]);  // años con datos de cada tramo
     N.t.forEach((r, i) => {
-      R.y[i] = r[0]; R.f[i] = r[1]; R.l[i] = r[2]; R.p[i] = N.leaf[r[2]][0]; R.j[i] = progJur[R.p[i]];
+      R.y[i] = r[0]; R.f[i] = r[1]; R.l[i] = r[2]; R.c[i] = CL[r[2]]; R.p[i] = N.leaf[r[2]][0]; R.g[i] = LIN[R.p[i]]; R.j[i] = progJur[R.p[i]];
       R.s[i] = r[3]; R.v[i] = r[4]; R.d[i] = r[5];
+      const py = PY[R.p[i]];
+      if (r[3] || r[4] || r[5]) { py[0] = Math.min(py[0], Y[r[0]]); py[1] = Math.max(py[1], Y[r[0]]); }
     });
     if (YP) { S.yRef = YP; S.yCmp = 2023; } else S.yRef = Math.min(S.yRef, YL - 1);
     root.innerHTML = TEMPLATE();
@@ -82,15 +105,41 @@
     return R.y[i] === iC ? R.s[i] : R.d[i];
   }
 
+  // ── cadenas de programas ──
+  function chain(r) {                     // tramos de la serie, en orden
+    const c = [r];
+    while (N.prog[c[c.length - 1]][4] >= 0) c.push(N.prog[c[c.length - 1]][4]);
+    return c;
+  }
+  const tip = r => { const c = chain(r); return c[c.length - 1]; };
+  const progLab = r => N.prog[tip(r)][1];
+  const progJn = r => N.prog[tip(r)][0];   // jurisdicción actual (la del último tramo)
+  const yrsTxt = (a, b) => a === b ? `${a}` : `${a}-${b}`;
+  const route = r => chain(r).map(m => N.jur[N.prog[m][0]][1] + (PY[m][0] <= PY[m][1] ? ` (${yrsTxt(PY[m][0], PY[m][1])})` : ''));
+  function names(r) {                     // historial de nombres de toda la cadena
+    const h = [];
+    chain(r).forEach(m => {
+      const p = N.prog[m];
+      (p[2].length ? p[2] : PY[m][0] <= PY[m][1] ? [[p[1], PY[m][0], PY[m][1]]] : []).forEach(x => {
+        const prev = h[h.length - 1];
+        if (prev && norm(prev[0]) === norm(x[0])) prev[2] = Math.max(prev[2], x[2]);
+        else h.push(x.slice());
+      });
+    });
+    return h;
+  }
+
   // ── ámbito y niveles ──
   const last = () => S.path[S.path.length - 1];
+  // Abierto un programa, la serie sigue en todas las jurisdicciones por las que pasó
+  const progOpen = () => S.path.some(n => n.t === 'prog');
   function inScope(i) {
     for (const n of S.path) {
       if (n.t === 'fun' && R.f[i] !== n.id) return false;
-      if (n.t === 'jur' && R.j[i] !== n.id) return false;
-      if (n.t === 'prog' && R.p[i] !== n.id) return false;
+      if (n.t === 'jur' && R.j[i] !== n.id && !progOpen()) return false;
+      if (n.t === 'prog' && R.g[i] !== n.id) return false;
       if (n.t === 'proj' && leafProj[R.l[i]] !== n.id) return false;
-      if (n.t === 'leaf' && R.l[i] !== n.id) return false;
+      if (n.t === 'leaf' && R.c[i] !== n.id) return false;
     }
     return true;
   }
@@ -105,14 +154,14 @@
   function childKey(i, lvl) {
     if (lvl === 'fun') return R.f[i];
     if (lvl === 'jur') return R.j[i];
-    if (lvl === 'prog') return R.p[i];
-    if (lvl === 'item') return leafProj[R.l[i]] || ('A' + R.l[i]);
-    return R.l[i];
+    if (lvl === 'prog') return R.g[i];
+    if (lvl === 'item') return leafProj[R.l[i]] || ('A' + R.c[i]);
+    return R.c[i];
   }
   function nodeOf(lvl, key) {
     if (lvl === 'fun') return {t: 'fun', id: key, label: N.fun[key][1]};
     if (lvl === 'jur') return {t: 'jur', id: key, label: N.jur[key][1]};
-    if (lvl === 'prog') return {t: 'prog', id: key, label: N.prog[key][1]};
+    if (lvl === 'prog') return {t: 'prog', id: key, label: progLab(key)};
     if (lvl === 'item') {
       if (typeof key === 'string' && key[0] === 'A') { const li = +key.slice(1); return {t: 'leaf', id: li, label: N.leaf[li][2]}; }
       return {t: 'proj', id: key, label: key.slice(key.indexOf('|') + 1)};
@@ -234,10 +283,17 @@
     const path = [];
     for (const p of parts.slice(1)) {
       const t = {f: 'fun', j: 'jur', p: 'prog', l: 'leaf'}[p[0]];
-      if (p[0] === 'P') { const id = decodeURIComponent(p.slice(1)); path.push({t: 'proj', id, label: id.slice(id.indexOf('|') + 1)}); continue; }
+      if (p[0] === 'P') {
+        // los enlaces viejos pueden traer un tramo intermedio de la cadena
+        const raw = decodeURIComponent(p.slice(1)), cut = raw.indexOf('|'), pi = +raw.slice(0, cut);
+        const id = N.prog[pi] ? PK.get(LIN[pi] + '|' + norm(raw.slice(cut + 1))) || raw : raw;
+        path.push({t: 'proj', id, label: id.slice(id.indexOf('|') + 1)}); continue;
+      }
       if (!t) return false;
-      const id = +p.slice(1);
-      const lab = t === 'fun' ? N.fun[id] && N.fun[id][1] : t === 'jur' ? N.jur[id] && N.jur[id][1] : t === 'prog' ? N.prog[id] && N.prog[id][1] : N.leaf[id] && N.leaf[id][2];
+      let id = +p.slice(1);
+      if (t === 'prog' && N.prog[id]) id = LIN[id];
+      if (t === 'leaf' && N.leaf[id]) id = CL[id];
+      const lab = t === 'fun' ? N.fun[id] && N.fun[id][1] : t === 'jur' ? N.jur[id] && N.jur[id][1] : t === 'prog' ? N.prog[id] && progLab(id) : N.leaf[id] && N.leaf[id][2];
       if (!lab) return false;
       path.push({t, id, label: lab});
     }
@@ -281,26 +337,26 @@
       const h = N.jur[l.id][2];
       info.push('Código ' + N.jur[l.id][0].replace('a', '') + '. ' + (h.length > 1 ? 'Nombres: ' + h.map(x => `${esc(x[0])} (${x[1] === x[2] ? x[1] : x[1] + '-' + x[2]})`).join(' · ') : `Con datos ${h[0][1]}-${h[h.length - 1][2]}.`));
     }
-    const jn = l && (l.t === 'jur' ? l.id : l.t === 'prog' ? N.prog[l.id][0] : null);
+    const jn = l && (l.t === 'jur' ? l.id : l.t === 'prog' ? progJn(l.id) : null);
     if (jn != null && N.jur[jn][3]) info.push('⚠ ' + esc(N.jur[jn][3]));
     if (l && l.t === 'prog') {
-      const p = N.prog[l.id];
-      info.push('<b>' + esc(N.jur[p[0]][1]) + '</b>');
-      if (p[2].length) info.push('Cambió de nombre: ' + p[2].map(x => `${esc(x[0])} (${x[1] === x[2] ? x[1] : x[1] + '-' + x[2]})`).join(' → '));
-      if (p[3] >= 0) info.push(`Viene de <a data-p="${p[3]}">${esc(N.jur[N.prog[p[3]][0]][1])}</a>: antes del traspaso la serie sigue allá.`);
-      if (p[4] >= 0) info.push(`Pasa a <a data-p="${p[4]}">${esc(N.jur[N.prog[p[4]][0]][1])}</a>: después del traspaso la serie sigue allá.`);
+      const rt = route(l.id);
+      if (rt.length > 1) info.push('<b>Pasó por ' + rt.length + ' jurisdicciones</b> y se muestra como una sola serie: ' + rt.map(esc).join(' → ') + '. Si el traspaso fue durante el año, ese año suma lo de las dos.');
+      else info.push('<b>' + esc(N.jur[progJn(l.id)][1]) + '</b>');
+      const h = names(l.id);
+      if (h.length > 1) info.push('Cambió de nombre: ' + h.map(x => `${esc(x[0])} (${yrsTxt(x[1], x[2])})`).join(' → '));
     }
     if (l && (l.t === 'proj' || l.t === 'leaf')) {
-      const pi = l.t === 'proj' ? +l.id.split('|')[0] : N.leaf[l.id][0];
-      info.push('Programa <a data-p="' + pi + '">' + esc(N.prog[pi][1]) + '</a> · ' + esc(N.jur[N.prog[pi][0]][1]));
+      const pi = l.t === 'proj' ? +l.id.split('|')[0] : LIN[N.leaf[l.id][0]];
+      info.push('Programa <a data-p="' + pi + '">' + esc(progLab(pi)) + '</a> · ' + route(pi).map(esc).join(' → '));
       if (l.t === 'leaf' && N.leaf[l.id][3]) info.push('Proyecto: ' + esc(N.leaf[l.id][3]));
     }
     const ex = A.ex;
     if (ex.s || ex.v) info.push(`${YL}: sancionado ${fM(ex.s)} · vigente al ${N.periodo[YL]} ${fM(ex.v)} · devengado al ${N.periodo[YL]} ${fM(ex.d)}` + (ex.v > 0 ? ` (${nf0.format(ex.d / ex.v * 100)}% del vigente)` : '') + ' · nominal');
     $('nvInfo').innerHTML = info.join('<br>');
     $('nvInfo').querySelectorAll('a[data-p]').forEach(a => a.onclick = () => {
-      const pi = +a.dataset.p; const j = N.prog[pi][0];
-      go([{t: 'jur', id: j, label: N.jur[j][1]}, {t: 'prog', id: pi, label: N.prog[pi][1]}], 'jur');
+      const pi = +a.dataset.p; const j = progJn(pi);
+      go([{t: 'jur', id: j, label: N.jur[j][1]}, {t: 'prog', id: pi, label: progLab(pi)}], 'jur');
     });
 
     // KPIs
@@ -440,12 +496,16 @@
       let sub = '', tag = '', grp = null;
       if (lvl === 'fun') grp = N.fun[k][0];
       if (lvl === 'prog') {
-        const p = N.prog[k];
-        if (S.mode === 'fun' || S.path.some(n => n.t === 'fun')) sub = N.jur[p[0]][1];
+        const m = chain(k), jl = S.path.find(n => n.t === 'jur');
+        if (!jl) sub = m.map(x => N.jur[N.prog[x][0]][1]).filter((x, i, a) => x !== a[i - 1]).join(' → ');
         const yrs = s.map((v, i) => v ? Y[i] : 0).filter(Boolean);
         if (yrs.length && (yrs[0] > Y[0] || yrs[yrs.length - 1] < YE)) sub += (sub ? ' · ' : '') + `con datos ${yrs[0]}-${yrs[yrs.length - 1]}`;
-        if (p[4] >= 0) sub += (sub ? ' · ' : '') + 'pasa a ' + N.jur[N.prog[p[4]][0]][1];
-        if (p[3] >= 0) sub += (sub ? ' · ' : '') + 'viene de ' + N.jur[N.prog[p[3]][0]][1];
+        if (jl) {
+          // dentro de un ministerio se ve su tramo; al abrir el programa, la serie entera
+          const a = m.findIndex(x => N.prog[x][0] === jl.id), b = m.length - 1 - [...m].reverse().findIndex(x => N.prog[x][0] === jl.id);
+          if (a >= 0 && b < m.length - 1) sub += (sub ? ' · ' : '') + 'pasa a ' + N.jur[N.prog[m[b + 1]][0]][1];
+          if (a > 0) sub += (sub ? ' · ' : '') + 'viene de ' + N.jur[N.prog[m[a - 1]][0]][1];
+        }
       }
       if (lvl === 'item') tag = nd.t === 'proj' ? 'P' : N.leaf[nd.id][1] === 'Z' ? 'Z' : 'A';
       if (lvl === 'leaf') tag = N.leaf[k][1] === 'O' && norm(N.leaf[k][2]) !== norm(N.leaf[k][3]) ? 'O' : 'A';
@@ -475,12 +535,14 @@
     };
     for (let i = 0; i < R.y.length; i++) {
       if (!inScope(i)) continue;
-      const p = R.p[i], l = R.l[i], lf = N.leaf[l];
-      if (hit(N.prog[p][1])) add('g' + p, () => ({nd: {t: 'prog', id: p, label: N.prog[p][1]}, tag: 'G', sub: N.jur[N.prog[p][0]][1], path: () => [{t: 'jur', id: N.prog[p][0], label: N.jur[N.prog[p][0]][1]}, {t: 'prog', id: p, label: N.prog[p][1]}]}), i);
+      const p = R.g[i], l = R.c[i], lf = N.leaf[l], pl = progLab(p), j = progJn(p);
+      const jtxt = () => chain(p).map(x => N.jur[N.prog[x][0]][1]).filter((x, i, a) => x !== a[i - 1]).join(' → ');
+      const base = () => [{t: 'jur', id: j, label: N.jur[j][1]}, {t: 'prog', id: p, label: pl}];
+      if (hit(pl)) add('g' + p, () => ({nd: {t: 'prog', id: p, label: pl}, tag: 'G', sub: jtxt(), path: base}), i);
       if (lf[1] === 'Z') continue;  // fila sintética del proyecto: solo cuenta para el programa
-      if (lf[1] === 'O' && hit(lf[3])) { const pk = leafProj[l]; add('P' + pk, () => ({nd: {t: 'proj', id: pk, label: lf[3]}, tag: 'P', sub: N.prog[p][1] + ' · ' + N.jur[N.prog[p][0]][1], path: () => [{t: 'jur', id: N.prog[p][0], label: N.jur[N.prog[p][0]][1]}, {t: 'prog', id: p, label: N.prog[p][1]}, {t: 'proj', id: pk, label: lf[3]}]}), i); }
-      if (hit(lf[2]) && !(lf[1] === 'O' && norm(lf[2]) === norm(lf[3]))) add('L' + l, () => ({nd: {t: 'leaf', id: l, label: lf[2]}, tag: lf[1] === 'O' ? 'O' : 'A', sub: (lf[1] === 'O' ? lf[3] + ' · ' : '') + N.prog[p][1] + ' · ' + N.jur[N.prog[p][0]][1],
-        path: () => { const b = [{t: 'jur', id: N.prog[p][0], label: N.jur[N.prog[p][0]][1]}, {t: 'prog', id: p, label: N.prog[p][1]}]; if (lf[1] === 'O') b.push({t: 'proj', id: leafProj[l], label: lf[3]}); b.push({t: 'leaf', id: l, label: lf[2]}); return b; }}), i);
+      if (lf[1] === 'O' && hit(lf[3])) { const pk = leafProj[l]; add('P' + pk, () => ({nd: {t: 'proj', id: pk, label: lf[3]}, tag: 'P', sub: pl + ' · ' + jtxt(), path: () => base().concat([{t: 'proj', id: pk, label: lf[3]}])}), i); }
+      if (hit(lf[2]) && !(lf[1] === 'O' && norm(lf[2]) === norm(lf[3]))) add('L' + l, () => ({nd: {t: 'leaf', id: l, label: lf[2]}, tag: lf[1] === 'O' ? 'O' : 'A', sub: (lf[1] === 'O' ? lf[3] + ' · ' : '') + pl + ' · ' + jtxt(),
+        path: () => { const b = base(); if (lf[1] === 'O') b.push({t: 'proj', id: leafProj[l], label: lf[3]}); b.push({t: 'leaf', id: l, label: lf[2]}); return b; }}), i);
     }
     return [...acc.values()].map(o => {
       let mx = 0; o.s.forEach((v, i) => { if (i !== iP && v * rfac(i) > o.s[mx] * rfac(mx)) mx = i; });
@@ -584,8 +646,8 @@
       let ok = true;
       for (const n of S.path) {
         if (n.t === 'fun' && b[1] !== n.id) { ok = false; break; }
-        if (n.t === 'jur' && progJur[b[2]] !== n.id) { ok = false; break; }
-        if (n.t === 'prog' && b[2] !== n.id) { ok = false; break; }
+        if (n.t === 'jur' && progJur[b[2]] !== n.id && !progOpen()) { ok = false; break; }
+        if (n.t === 'prog' && LIN[b[2]] !== n.id) { ok = false; break; }
       }
       if (!ok) continue;
       const key = S.tab === 'inc' ? N.ppal[b[4]][1] : b[4];
